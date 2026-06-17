@@ -11,16 +11,18 @@ Upgrades over the starter script
   • One-cycle LR schedule — converges faster within a 30-hour GPU budget.
   • Best-checkpoint saving — download best_model.pth after the run.
   • Dice score logged alongside IoU every epoch.
+  • 80/10/10 train/val/test split; test_pairs.json written alongside checkpoint.
+  • best_model_meta.json records training config for reproducibility.
 
 HOW TO RUN (free GPU — no local setup needed):
   1. https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset
   2. New Notebook → Settings → Accelerator → GPU T4 → OK
-  3. Paste this file into one cell and click Run All.  (~12 min for 8 epochs)
+  3. Paste this file into one cell and click Run All.  (~25 min for 20 epochs)
 
-Local:
+Local (Apple Silicon or CUDA):
   pip install -r requirements.txt
   # set DATA_DIR to your DeepGlobe train/ folder below, then:
-  python starter/ps4_trackA_road_unet.py
+  python track_a/road_segmentation.py
 """
 
 # ── 0. Install if needed ─────────────────────────────────────────────────────
@@ -28,7 +30,7 @@ import subprocess, sys
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                 "segmentation-models-pytorch"], check=False)
 
-import os, glob, random
+import json, os, glob, random
 import numpy as np
 import cv2
 import torch
@@ -42,7 +44,14 @@ import matplotlib.pyplot as plt
 
 SEED = 42
 random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# MPS (Apple Silicon) support
+if torch.cuda.is_available():
+    DEVICE = "cuda"
+elif torch.backends.mps.is_available():
+    DEVICE = "mps"
+else:
+    DEVICE = "cpu"
 print("Device:", DEVICE)
 
 # ── 1. Locate data ───────────────────────────────────────────────────────────
@@ -51,7 +60,7 @@ for root, dirs, files in os.walk("/kaggle/input"):
     if root.endswith("train") and any(f.endswith("_sat.jpg") for f in files):
         DATA_DIR = root; break
 if DATA_DIR is None:
-    DATA_DIR = "deepglobe/train"   # ← change to your local path
+    DATA_DIR = "data/deepglobe/train"   # ← change to your local path
 print("Train folder:", DATA_DIR)
 
 sat_paths = sorted(glob.glob(os.path.join(DATA_DIR, "*_sat.jpg")))
@@ -59,28 +68,34 @@ pairs = [(p, p.replace("_sat.jpg", "_mask.png")) for p in sat_paths
          if os.path.exists(p.replace("_sat.jpg", "_mask.png"))]
 print(f"Found {len(pairs)} image/mask pairs.")
 
-SUBSET = 800
+SUBSET = 3000
 random.shuffle(pairs)
 pairs = pairs[:SUBSET]
-split = int(0.8 * len(pairs))
-train_pairs, val_pairs = pairs[:split], pairs[split:]
-print(f"train: {len(train_pairs)}  val: {len(val_pairs)}")
+
+n = len(pairs)
+train_pairs = pairs[:int(0.8 * n)]
+val_pairs   = pairs[int(0.8 * n):int(0.9 * n)]
+test_pairs  = pairs[int(0.9 * n):]
+print(f"train: {len(train_pairs)}  val: {len(val_pairs)}  test: {len(test_pairs)}")
 
 # ── 2. Dataset with occlusion augmentation ───────────────────────────────────
-IMG = 256
+IMG   = 512
+BATCH = 4 if DEVICE == "cuda" else 2
 
 train_tf = A.Compose([
     A.Resize(IMG, IMG),
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.3),
     A.RandomRotate90(p=0.5),
+    A.Affine(scale=(0.9, 1.1), translate_percent=0.1, rotate=(-15, 15), p=0.4),
     # occlusion simulation: shadows + rectangular canopy blackouts
     A.RandomShadow(p=0.4),
-    A.CoarseDropout(max_holes=8, max_height=32, max_width=32,
-                    fill_value=0, p=0.5),
+    A.CoarseDropout(num_holes_range=(2, 12), hole_height_range=(8, 40),
+                    hole_width_range=(8, 40), fill=0, p=0.5),
     # colour / noise jitter
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.4),
-    A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+    A.RandomGamma(gamma_limit=(80, 120), p=0.3),
+    A.GaussNoise(std_range=(0.01, 0.05), p=0.3),
     A.Normalize(),
     ToTensorV2(),
 ])
@@ -103,10 +118,12 @@ class RoadDS(Dataset):
         return a["image"], a["mask"].unsqueeze(0)
 
 
-train_dl = DataLoader(RoadDS(train_pairs, train_tf), batch_size=8,
-                      shuffle=True, num_workers=2, pin_memory=True)
-val_dl   = DataLoader(RoadDS(val_pairs, val_tf),     batch_size=8,
-                      shuffle=False, num_workers=2, pin_memory=True)
+# pin_memory only works on CUDA — disabled for MPS and CPU
+pin = (DEVICE == "cuda")
+train_dl = DataLoader(RoadDS(train_pairs, train_tf), batch_size=BATCH,
+                      shuffle=True,  num_workers=2, pin_memory=pin)
+val_dl   = DataLoader(RoadDS(val_pairs,   val_tf),   batch_size=BATCH,
+                      shuffle=False, num_workers=2, pin_memory=pin)
 
 # ── 3. CP_clDice loss ────────────────────────────────────────────────────────
 # Soft skeleton via iterative morphological min/max pooling (differentiable).
@@ -127,7 +144,7 @@ def soft_skel(x: torch.Tensor, iters: int = 5) -> torch.Tensor:
     """Differentiable soft skeleton via iterative opening subtraction."""
     skel = F.relu(x - _soft_dilate(_soft_erode(x)))
     for _ in range(iters - 1):
-        x    = _soft_erode(x)
+        x     = _soft_erode(x)
         delta = F.relu(x - _soft_dilate(_soft_erode(x)))
         skel  = skel + F.relu(delta - skel * delta)
     return skel
@@ -151,10 +168,9 @@ model     = smp.Unet("resnet34", encoder_weights="imagenet",
 dice_loss = smp.losses.DiceLoss(mode="binary")
 bce_loss  = nn.BCEWithLogitsLoss()
 
-# loss weights: Dice + BCE + clDice
-ALPHA, BETA, GAMMA = 0.4, 0.3, 0.3
+ALPHA, BETA, GAMMA = 0.4, 0.3, 0.3   # Dice, BCE, clDice
 
-EPOCHS = 8
+EPOCHS = 20
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     opt, max_lr=1e-3, steps_per_epoch=len(train_dl), epochs=EPOCHS)
@@ -173,7 +189,14 @@ def batch_metrics(logits, target, thr=0.5):
 # ── 5. Training loop ─────────────────────────────────────────────────────────
 out_dir   = "/kaggle/working" if os.path.isdir("/kaggle/working") else "."
 best_path = os.path.join(out_dir, "best_model.pth")
+meta_path = os.path.join(out_dir, "best_model_meta.json")
+test_path = os.path.join(out_dir, "test_pairs.json")
 best_iou  = 0.0
+
+# save test split alongside checkpoint so eval/metrics.py can load it
+with open(test_path, "w") as f:
+    json.dump(test_pairs, f)
+print(f"Test split saved → {test_path}")
 
 for ep in range(1, EPOCHS + 1):
     model.train(); train_loss = 0.0
@@ -203,12 +226,21 @@ for ep in range(1, EPOCHS + 1):
     if mean_iou > best_iou:
         best_iou = mean_iou
         torch.save(model.state_dict(), best_path)
+        with open(meta_path, "w") as f:
+            json.dump({
+                "best_val_iou": round(best_iou, 4),
+                "epoch": ep,
+                "img_size": IMG,
+                "subset": SUBSET,
+                "loss_weights": {"dice": ALPHA, "bce": BETA, "cldice": GAMMA},
+                "device": DEVICE,
+            }, f, indent=2)
         print(f"         ✓ new best — saved {best_path}")
 
 print(f"\nBest val IoU: {best_iou:.3f}")
 
 # ── 6. Visualise predictions ─────────────────────────────────────────────────
-model.load_state_dict(torch.load(best_path, map_location=DEVICE))
+model.load_state_dict(torch.load(best_path, map_location=DEVICE, weights_only=True))
 model.eval()
 x, y = next(iter(val_dl))
 with torch.no_grad():
@@ -219,8 +251,8 @@ STD  = np.array([0.229, 0.224, 0.225])
 
 fig, ax = plt.subplots(3, 3, figsize=(11, 11))
 for r in range(3):
-    img = x[r].permute(1, 2, 0).numpy() * STD + MEAN
-    ax[r, 0].imshow(np.clip(img, 0, 1));      ax[r, 0].set_title("satellite image")
+    img_vis = x[r].permute(1, 2, 0).numpy() * STD + MEAN
+    ax[r, 0].imshow(np.clip(img_vis, 0, 1)); ax[r, 0].set_title("satellite image")
     ax[r, 1].imshow(y[r, 0],    cmap="gray"); ax[r, 1].set_title("ground truth")
     ax[r, 2].imshow(pred[r, 0], cmap="gray"); ax[r, 2].set_title("SatMesh prediction")
     for c in range(3):
@@ -231,5 +263,5 @@ plt.tight_layout()
 fig_path = os.path.join(out_dir, "ps4_predictions.png")
 plt.savefig(fig_path, dpi=140, bbox_inches="tight")
 plt.show()
-print(f"Saved {fig_path}  ← download for the proposal")
-print("Next: feed the predicted road mask into starter/ps4_data_check.py (Track B graph half).")
+print(f"Saved {fig_path}")
+print("Next: python track_a/infer.py --checkpoint best_model.pth --input <image>")
