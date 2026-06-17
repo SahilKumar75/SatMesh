@@ -1,0 +1,9 @@
+data/
+outputs/
+*.pth
+*.gpickle
+test_pairs.json
+best_model_meta.json
+__pycache__/
+*.pyc
+.DS_Store
