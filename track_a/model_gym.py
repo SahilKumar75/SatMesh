@@ -262,6 +262,49 @@ def train_arm(arm: Arm, train_pairs, val_pairs, img, batch, epochs, cldice_iters
 
 
 @torch.no_grad()
+def render_predictions(model, pairs, img, out_path, n=4, threshold=0.5):
+    """Save a satellite | ground-truth | prediction panel for a few test images."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    model.eval()
+    _, val_tf = make_tfs(img, occ_aug=False)
+    MEAN = np.array([0.485, 0.456, 0.406]); STD = np.array([0.229, 0.224, 0.225])
+
+    # prefer images that actually contain roads (more informative than empty tiles)
+    chosen = []
+    for sp, mp in pairs:
+        g = cv2.imread(mp, cv2.IMREAD_GRAYSCALE)
+        if g is not None and (g > 127).mean() > 0.02:
+            chosen.append((sp, mp))
+        if len(chosen) == n:
+            break
+    if not chosen:
+        chosen = pairs[:n]
+
+    fig, axes = plt.subplots(len(chosen), 3, figsize=(12, 4 * len(chosen)))
+    if len(chosen) == 1:
+        axes = [axes]
+    for i, (sp, mp) in enumerate(chosen):
+        raw = cv2.imread(sp)
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        gt  = cv2.imread(mp, cv2.IMREAD_GRAYSCALE)
+        t = val_tf(image=rgb)["image"].unsqueeze(0).to(DEVICE)
+        with torch.autocast(device_type="cuda", enabled=(DEVICE == "cuda")):
+            prob = torch.sigmoid(model(t))[0, 0].float().cpu().numpy()
+        pred = (prob > threshold).astype(np.uint8) * 255
+        disp = cv2.resize(cv2.cvtColor(raw, cv2.COLOR_BGR2RGB), (img, img))
+        gt_r = cv2.resize(gt, (img, img), interpolation=cv2.INTER_NEAREST)
+        axes[i][0].imshow(disp);          axes[i][0].set_title("satellite image"); axes[i][0].axis("off")
+        axes[i][1].imshow(gt_r, cmap="gray"); axes[i][1].set_title("ground truth"); axes[i][1].axis("off")
+        axes[i][2].imshow(pred, cmap="gray"); axes[i][2].set_title("SatMesh prediction"); axes[i][2].axis("off")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=140, bbox_inches="tight")
+    plt.close(fig)
+    print(f"    viz saved -> {out_path}")
+
+
+@torch.no_grad()
 def eval_on_test(model, test_pairs, img, threshold=0.5):
     """Score on the held-out test set with the PS4 judge metrics."""
     model.eval()
@@ -297,6 +340,8 @@ def main():
     ap.add_argument("--train_n", type=int, default=1500, help="training images per arm")
     ap.add_argument("--cldice_iters", type=int, default=3)
     ap.add_argument("--seeds", type=int, default=1, help="run each arm over N seeds, report mean±std")
+    ap.add_argument("--viz", action="store_true", help="save a prediction panel per arm")
+    ap.add_argument("--save_ckpt", action="store_true", help="save each arm's best checkpoint")
     ap.add_argument("--out", default="gym_results")
     args = ap.parse_args()
 
@@ -339,6 +384,13 @@ def main():
         agg.append(row)
         oc = row["occlusion_recall"]
         print(f"    => OccRecall {oc[0]:.4f} ± {oc[1]:.4f}  ({dt:.1f} min total)")
+
+        # `model` holds the last-seed model — use it for viz / checkpoint
+        if args.viz:
+            render_predictions(model, test_pairs, args.img, f"{arm.name}_predictions.png")
+        if args.save_ckpt:
+            torch.save(model.state_dict(), f"{arm.name}_best.pth")
+            print(f"    checkpoint saved -> {arm.name}_best.pth")
 
     if agg:
         multi = args.seeds > 1
