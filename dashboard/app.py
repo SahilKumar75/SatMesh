@@ -92,9 +92,13 @@ def geo_project(_G: nx.Graph) -> dict:
 # ── Colour: green (low) → red (high betweenness) ────────────────────────────────
 
 def _bc_colour(v: float, vmax: float) -> str:
+    # Green (low betweenness) -> amber -> red (gatekeeper). Tuned for legibility
+    # on a dark CartoDB basemap: keep a green floor so low nodes stay visible.
     r = v / vmax if vmax > 0 else 0.0
-    red, grn = int(255 * r), int(180 * (1 - r))
-    return f"#{red:02x}{grn:02x}20"
+    red = int(60 + 195 * r)
+    grn = int(200 * (1 - r) + 40 * r)
+    blu = int(70 * (1 - r))
+    return f"#{red:02x}{grn:02x}{blu:02x}"
 
 
 # ── Nearest-node lookup ─────────────────────────────────────────────────────────
@@ -119,27 +123,31 @@ def build_map(G, geo, bc, disabled, reroute_path):
     bc_max = max(bc.values()) if bc else 1.0
     coords = np.array([geo[n] for n in G.nodes])
     centre = (coords[:, 0].mean(), coords[:, 1].mean()) if len(coords) else CITY_CENTER
-    m = folium.Map(location=centre, zoom_start=15, tiles="CartoDB positron")
+    m = folium.Map(location=centre, zoom_start=15, tiles="CartoDB dark_matter",
+                   control_scale=True)
 
     reroute_set = set(zip(reroute_path[:-1], reroute_path[1:]))
     for u, v, data in G.edges(data=True):
         ul = geo[u]; vl = geo[v]
         is_rr = (u, v) in reroute_set or (v, u) in reroute_set
         is_syn = data.get("synthetic", False)
-        colour = "#ff7f0e" if is_rr else ("#2ca02c" if is_syn else "#bbbbbb")
-        weight = 6 if is_rr else (3 if is_syn else 1.5)
-        folium.PolyLine([ul, vl], color=colour, weight=weight, opacity=0.85).add_to(m)
+        # On dark tiles: amber reroute, bright-green healed bridge, muted slate base.
+        colour = "#f59e0b" if is_rr else ("#22c55e" if is_syn else "#475569")
+        weight = 6 if is_rr else (3 if is_syn else 1.2)
+        opacity = 0.95 if (is_rr or is_syn) else 0.55
+        folium.PolyLine([ul, vl], color=colour, weight=weight, opacity=opacity).add_to(m)
 
     for n in sorted(bc, key=bc.get, reverse=True)[:500]:
         lat, lon = geo[n]
         off = n in disabled
-        colour = "#000000" if off else _bc_colour(bc.get(n, 0), bc_max)
+        fill = "#0a0f1a" if off else _bc_colour(bc.get(n, 0), bc_max)
+        ring = "#f43f5e" if off else fill
         folium.CircleMarker(
             location=(lat, lon),
-            radius=10 if off else max(3, int(bc.get(n, 0) / bc_max * 9)),
-            color=colour, weight=3 if off else 1,
-            fill=True, fill_color=colour, fill_opacity=0.9,
-            tooltip=f"Node {n} — BC {bc.get(n, 0):.3f}" + ("  (DISABLED)" if off else ""),
+            radius=11 if off else max(3, int(bc.get(n, 0) / bc_max * 9)),
+            color=ring, weight=3 if off else 1,
+            fill=True, fill_color=fill, fill_opacity=0.95,
+            tooltip=f"Node {n} — betweenness {bc.get(n, 0):.3f}" + ("  ·  DISABLED" if off else ""),
         ).add_to(m)
     return m
 
@@ -150,15 +158,189 @@ def _lcc(G):
     return len(max(nx.connected_components(G), key=len)) if G.number_of_nodes() else 0
 
 
+def _inject_css():
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+
+        :root {
+            --sm-bg:        #0a0f1a;
+            --sm-surface:   #111a2b;
+            --sm-surface-2: #16223a;
+            --sm-border:    #1e2d47;
+            --sm-text:      #e2e8f0;
+            --sm-muted:     #7e8da6;
+            --sm-accent:    #38bdf8;
+            --sm-good:      #22c55e;
+            --sm-bad:       #f43f5e;
+            --sm-warn:      #f59e0b;
+        }
+
+        html, body, [class*="css"], .stApp, .stMarkdown, p, span, label, div {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        .stApp { background: var(--sm-bg); }
+
+        /* hide default Streamlit chrome for a cleaner product look */
+        #MainMenu, header[data-testid="stHeader"], footer { visibility: hidden; }
+        .block-container { padding-top: 1.4rem; padding-bottom: 2.5rem; max-width: 1500px; }
+
+        /* ── App header / title bar ─────────────────────────────── */
+        .sm-header {
+            display: flex; align-items: center; gap: 16px;
+            padding: 18px 22px; margin-bottom: 18px;
+            background: linear-gradient(135deg, #101a2e 0%, #0c1322 100%);
+            border: 1px solid var(--sm-border);
+            border-radius: 12px;
+            box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px rgba(0,0,0,.35);
+        }
+        .sm-mark {
+            width: 46px; height: 46px; flex: 0 0 46px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--sm-accent) 0%, #0ea5e9 60%, #2563eb 100%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .sm-wordmark {
+            font-size: 1.5rem; font-weight: 800; letter-spacing: .5px;
+            color: var(--sm-text); line-height: 1.1;
+        }
+        .sm-wordmark .sm-accent { color: var(--sm-accent); }
+        .sm-sub {
+            font-size: .80rem; color: var(--sm-muted); margin-top: 2px;
+            letter-spacing: .2px; font-weight: 500;
+        }
+        .sm-badge {
+            margin-left: auto; align-self: flex-start;
+            font-size: .68rem; font-weight: 600; letter-spacing: .8px;
+            text-transform: uppercase;
+            color: var(--sm-accent);
+            border: 1px solid var(--sm-border);
+            background: rgba(56,189,248,.08);
+            padding: 5px 10px; border-radius: 6px;
+        }
+
+        /* ── Metric cards ───────────────────────────────────────── */
+        .sm-card {
+            background: var(--sm-surface);
+            border: 1px solid var(--sm-border);
+            border-radius: 11px;
+            padding: 14px 16px;
+            height: 100%;
+            box-shadow: 0 4px 14px rgba(0,0,0,.25);
+        }
+        .sm-card .sm-label {
+            font-size: .70rem; font-weight: 600; letter-spacing: .9px;
+            text-transform: uppercase; color: var(--sm-muted);
+        }
+        .sm-card .sm-value {
+            font-size: 1.9rem; font-weight: 700; color: var(--sm-text);
+            font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: 6px;
+            font-feature-settings: "tnum" 1;
+        }
+        .sm-card .sm-delta {
+            font-size: .80rem; font-weight: 600; margin-top: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+        .sm-delta.good { color: var(--sm-good); }
+        .sm-delta.bad  { color: var(--sm-bad); }
+        .sm-delta.flat { color: var(--sm-muted); }
+
+        /* ── Section panels ─────────────────────────────────────── */
+        .sm-panel {
+            background: var(--sm-surface);
+            border: 1px solid var(--sm-border);
+            border-radius: 11px;
+            padding: 4px 14px 10px 14px;
+            margin-bottom: 14px;
+        }
+        .sm-panel-title {
+            font-size: .80rem; font-weight: 700; letter-spacing: .6px;
+            text-transform: uppercase; color: var(--sm-text);
+            padding: 12px 2px 8px 2px;
+            border-bottom: 1px solid var(--sm-border);
+            margin-bottom: 8px;
+        }
+        .sm-panel-title .dot {
+            display:inline-block; width:7px; height:7px; border-radius:50%;
+            background: var(--sm-accent); margin-right:8px; vertical-align: middle;
+        }
+
+        /* map container framing */
+        iframe { border-radius: 11px; border: 1px solid var(--sm-border); }
+
+        /* dataframes */
+        [data-testid="stDataFrame"] { border-radius: 9px; }
+
+        /* sidebar */
+        section[data-testid="stSidebar"] {
+            background: #0c1322;
+            border-right: 1px solid var(--sm-border);
+        }
+        .sm-side-head {
+            font-size: .72rem; font-weight: 700; letter-spacing: 1px;
+            text-transform: uppercase; color: var(--sm-accent);
+            margin: 4px 0 2px 0;
+        }
+        section[data-testid="stSidebar"] .stButton button {
+            border-radius: 8px; font-weight: 600;
+            border: 1px solid var(--sm-border);
+        }
+
+        .sm-legend { font-size:.78rem; color: var(--sm-muted); margin: 4px 0 8px 0; }
+        .sm-legend b { color: var(--sm-text); font-weight:600; }
+        .sm-chip { display:inline-block; width:9px; height:9px; border-radius:2px;
+                   margin: 0 5px 0 12px; vertical-align: middle; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+_SM_GLYPH = (
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" '
+    'xmlns="http://www.w3.org/2000/svg">'
+    '<circle cx="6" cy="6" r="2.2" fill="#0a0f1a"/>'
+    '<circle cx="18" cy="7" r="2.2" fill="#0a0f1a"/>'
+    '<circle cx="12" cy="17" r="2.2" fill="#0a0f1a"/>'
+    '<path d="M6 6 L18 7 M6 6 L12 17 M18 7 L12 17" stroke="#0a0f1a" '
+    'stroke-width="1.6" stroke-linecap="round"/></svg>'
+)
+
+
+def _metric_card(col, label, value, delta=None, good=None):
+    cls = "flat" if good is None else ("good" if good else "bad")
+    delta_html = f'<div class="sm-delta {cls}">{delta}</div>' if delta is not None else \
+                 '<div class="sm-delta flat">&nbsp;</div>'
+    col.markdown(
+        f'<div class="sm-card"><div class="sm-label">{label}</div>'
+        f'<div class="sm-value">{value}</div>{delta_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def main():
-    st.set_page_config(page_title="SatMesh — Route Resilience", layout="wide")
-    st.title("SatMesh — Urban Road Network Resilience")
-    st.caption("Click a red intersection on the map to simulate its failure "
-               "(flood / accident) and watch the network degrade.")
+    st.set_page_config(
+        page_title="SatMesh — Route Resilience",
+        page_icon="◆",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    _inject_css()
+    st.markdown(
+        f'<div class="sm-header">'
+        f'<div class="sm-mark">{_SM_GLYPH}</div>'
+        f'<div><div class="sm-wordmark">Sat<span class="sm-accent">Mesh</span></div>'
+        f'<div class="sm-sub">Occlusion-Robust Road Extraction &amp; Graph-Theoretic '
+        f'Resilience Analysis &middot; ISRO BAH 2026 PS4</div></div>'
+        f'<div class="sm-badge">Bengaluru &middot; Live Stress Test</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     args = _parse_args()
     with st.sidebar:
-        st.header("Data")
+        st.markdown('<div class="sm-side-head">Data Sources</div>', unsafe_allow_html=True)
         graph_path = st.text_input("Healed graph (.gpickle)", value=args.graph)
         crit_path  = st.text_input("Criticality JSON", value=args.criticality)
 
@@ -186,8 +368,9 @@ def main():
 
     # ── Sidebar controls ──────────────────────────────────────────────────────
     with st.sidebar:
-        st.divider(); st.header("Failure simulation")
-        if st.button("⚡ Disable top 3 gatekeepers", use_container_width=True):
+        st.divider()
+        st.markdown('<div class="sm-side-head">Failure Simulation</div>', unsafe_allow_html=True)
+        if st.button("▲  Disable top 3 gatekeepers", use_container_width=True, type="primary"):
             ss["disabled"] = [ranked[i] for i in range(min(3, len(ranked)))]
             ss["reroute_path"] = []; ss["reroute_info"] = None
             st.rerun()
@@ -195,7 +378,8 @@ def main():
             ss["disabled"] = []; ss["reroute_path"] = []; ss["reroute_info"] = None
             st.rerun()
 
-        st.divider(); st.header("Route under disruption")
+        st.divider()
+        st.markdown('<div class="sm-side-head">Route Under Disruption</div>', unsafe_allow_html=True)
         node_opts = [str(n) for n in G.nodes]
         src = st.selectbox("From", node_opts, index=0)
         dst = st.selectbox("To", node_opts, index=min(len(node_opts) - 1, 20))
@@ -223,30 +407,46 @@ def main():
 
     # ── Impact readout ────────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Intersections", G.number_of_nodes())
-    c2.metric("Disabled", len(disabled))
-    c3.metric("Connected reach", f"{retained:.0f}%",
-              delta=f"{retained - 100:.0f}%" if disabled else None,
-              delta_color="inverse")
-    c4.metric("Intersections isolated", isolated, delta=isolated if disabled else None,
-              delta_color="inverse")
-    c5.metric("Separate areas", components)
+    _metric_card(c1, "Intersections", f"{G.number_of_nodes():,}")
+    _metric_card(c2, "Disabled", f"{len(disabled)}",
+                 delta=(f"+{len(disabled)} failed" if disabled else None),
+                 good=False if disabled else None)
+    _metric_card(c3, "Connected reach", f"{retained:.0f}%",
+                 delta=(f"{retained - 100:.0f} pts" if disabled else None),
+                 good=False if disabled else None)
+    _metric_card(c4, "Intersections isolated", f"{isolated:,}",
+                 delta=(f"+{isolated:,} cut off" if disabled else None),
+                 good=(isolated == 0) if disabled else None)
+    _metric_card(c5, "Separate areas", f"{components}",
+                 delta=("fragmented" if components > 1 else "intact"),
+                 good=(components == 1))
 
     info = ss["reroute_info"]
     if info:
+        st.write("")
         if info[0] == "cut":
-            st.error(f"🚧 Route severed — destination is unreachable after the failure "
-                     f"(baseline was {info[1]:.0f} m).")
+            st.error(f"Route severed — destination is unreachable after the failure "
+                     f"(baseline path was {info[1]:.0f} m).")
         else:
             base_len, (new_len, inc) = info[1], info[2]
-            st.warning(f"↪ Detour required: travel distance **{base_len:.0f} m → {new_len:.0f} m**, "
+            st.warning(f"Detour required: travel distance **{base_len:.0f} m → {new_len:.0f} m**, "
                        f"a **+{inc:.0f}%** increase in travel time.")
 
     # ── Map + side panels ─────────────────────────────────────────────────────
-    map_col, side = st.columns([3, 1])
+    st.write("")
+    map_col, side = st.columns([3, 1], gap="medium")
     with map_col:
-        st.caption("Node colour = betweenness (green low → red gatekeeper) · "
-                   "black = disabled · green lines = healed bridges · orange = reroute")
+        st.markdown(
+            '<div class="sm-legend">'
+            '<span class="sm-chip" style="background:#22c55e"></span><b>Low</b> betweenness'
+            '<span class="sm-chip" style="background:#f59e0b"></span>rising'
+            '<span class="sm-chip" style="background:#dd3030"></span><b>Gatekeeper</b>'
+            '<span class="sm-chip" style="background:#0a0f1a;border:2px solid #f43f5e"></span><b>Disabled</b>'
+            '<span class="sm-chip" style="background:#22c55e"></span>healed bridge'
+            '<span class="sm-chip" style="background:#f59e0b"></span>reroute'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         fmap = build_map(G, geo, bc, disabled, ss["reroute_path"])
         md = st_folium(fmap, width=None, height=560, key="map")
         clk = (md or {}).get("last_object_clicked")
@@ -258,20 +458,27 @@ def main():
                 st.rerun()
 
     with side:
-        st.subheader("Top Gatekeeper Nodes")
+        st.markdown(
+            '<div class="sm-panel-title"><span class="dot"></span>Top Gatekeeper Nodes</div>',
+            unsafe_allow_html=True,
+        )
         st.dataframe(
             pd.DataFrame([(str(n), round(bc[n], 3)) for n in ranked[:10]],
-                         columns=["node", "betweenness"]).set_index("node"),
+                         columns=["Node", "Betweenness"]).set_index("Node"),
             use_container_width=True,
         )
         if crit and "ablation" in crit:
-            st.subheader("Resilience under attack")
+            st.markdown(
+                '<div class="sm-panel-title"><span class="dot"></span>Resilience Under Attack</div>',
+                unsafe_allow_html=True,
+            )
             abl = crit["ablation"]
             st.line_chart(
                 pd.DataFrame({
                     "Resilience Index": [r["resilience_index"] for r in abl],
                     "Connected fraction": [r["lcc_fraction"] for r in abl],
-                }, index=[r["n_removed"] for r in abl])
+                }, index=[r["n_removed"] for r in abl]),
+                color=["#38bdf8", "#f59e0b"],
             )
             st.caption("Adaptive betweenness attack — both fall as gatekeepers are removed.")
 
