@@ -208,7 +208,10 @@ def build_model(arm: Arm) -> nn.Module:
 
 # ── Train + evaluate one arm ───────────────────────────────────────────────────
 
-def train_arm(arm: Arm, train_pairs, val_pairs, img, batch, epochs, cldice_iters):
+def train_arm(arm: Arm, train_pairs, val_pairs, img, batch, epochs, cldice_iters, seed=SEED):
+    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+    if DEVICE == "cuda":
+        torch.cuda.manual_seed_all(seed)
     train_tf, val_tf = make_tfs(img, arm.occ_aug)
     pin = (DEVICE == "cuda")
     train_dl = DataLoader(RoadDS(train_pairs, train_tf), batch_size=batch,
@@ -222,7 +225,7 @@ def train_arm(arm: Arm, train_pairs, val_pairs, img, batch, epochs, cldice_iters
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(
         opt, max_lr=1e-3, steps_per_epoch=len(train_dl), epochs=epochs)
-    scaler = torch.cuda.amp.GradScaler(enabled=(DEVICE == "cuda"))
+    scaler = torch.amp.GradScaler("cuda", enabled=(DEVICE == "cuda"))
 
     best_iou, best_state = 0.0, None
     for ep in range(1, epochs + 1):
@@ -293,6 +296,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=15)
     ap.add_argument("--train_n", type=int, default=1500, help="training images per arm")
     ap.add_argument("--cldice_iters", type=int, default=3)
+    ap.add_argument("--seeds", type=int, default=1, help="run each arm over N seeds, report mean±std")
     ap.add_argument("--out", default="gym_results")
     args = ap.parse_args()
 
@@ -307,46 +311,62 @@ def main():
     train_pairs = pairs[:args.train_n]
     print(f"train {len(train_pairs)}  val {len(val_pairs)}  test {len(test_pairs)}")
 
-    results = []
+    seeds = list(range(SEED, SEED + args.seeds))
+    METRICS = ["iou", "dice", "relaxed_iou", "occlusion_recall"]
+    agg = []
     for name in args.arms:
         if name not in ARMS:
             print(f"  ! unknown arm '{name}', skipping"); continue
         arm = ARMS[name]
         print(f"\n=== arm: {arm.name}  ({arm.arch}/{arm.encoder}, "
-              f"clDice={arm.use_cldice}, occ_aug={arm.occ_aug}) ===")
+              f"clDice={arm.use_cldice}, occ_aug={arm.occ_aug})  seeds={seeds} ===")
+        per_seed = []
         t0 = time.time()
-        model, best_val = train_arm(arm, train_pairs, val_pairs,
-                                    args.img, args.batch, args.epochs, args.cldice_iters)
-        metrics = eval_on_test(model, test_pairs, args.img)
-        dt = time.time() - t0
-        row = {"arm": arm.name, "val_iou": round(best_val, 4),
-               **{k: round(v, 4) for k, v in metrics.items()},
-               "minutes": round(dt / 60, 1)}
-        results.append(row)
-        print(f"    test: IoU {row['iou']}  Dice {row['dice']}  "
-              f"RelaxedIoU {row['relaxed_iou']}  OccRecall {row['occlusion_recall']}  "
-              f"({row['minutes']} min)")
+        for sd in seeds:
+            model, best_val = train_arm(arm, train_pairs, val_pairs,
+                                        args.img, args.batch, args.epochs,
+                                        args.cldice_iters, seed=sd)
+            m = eval_on_test(model, test_pairs, args.img)
+            m["val_iou"] = best_val
+            per_seed.append(m)
+            print(f"    seed {sd}: OccRecall {m['occlusion_recall']:.4f}  "
+                  f"RelaxedIoU {m['relaxed_iou']:.4f}  IoU {m['iou']:.4f}")
+        dt = (time.time() - t0) / 60
+        row = {"arm": arm.name, "minutes": round(dt, 1)}
+        for k in METRICS + ["val_iou"]:
+            vals = [p[k] for p in per_seed]
+            row[k] = (float(np.mean(vals)), float(np.std(vals)))
+        agg.append(row)
+        oc = row["occlusion_recall"]
+        print(f"    => OccRecall {oc[0]:.4f} ± {oc[1]:.4f}  ({dt:.1f} min total)")
 
-    # write CSV + markdown table
-    if results:
+    if agg:
+        multi = args.seeds > 1
+        def cell(t): return f"{t[0]:.4f} ± {t[1]:.4f}" if multi else f"{t[0]:.4f}"
         import csv
-        keys = ["arm", "iou", "dice", "relaxed_iou", "occlusion_recall", "val_iou", "minutes"]
         with open(f"{args.out}.csv", "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=keys); w.writeheader(); w.writerows(results)
+            w = csv.writer(f)
+            w.writerow(["arm", "iou", "iou_std", "dice", "dice_std",
+                        "relaxed_iou", "relaxed_iou_std",
+                        "occlusion_recall", "occlusion_recall_std", "val_iou", "minutes"])
+            for r in agg:
+                w.writerow([r["arm"], *r["iou"], *r["dice"], *r["relaxed_iou"],
+                            *r["occlusion_recall"], r["val_iou"][0], r["minutes"]])
         with open(f"{args.out}.md", "w") as f:
             f.write("# SatMesh Model Gym — Track A Ablation\n\n")
-            f.write("Held-out test set. Headline metric: **Occlusion-Recall** "
-                    "(roads recovered under shadow).\n\n")
-            f.write("| Arm | IoU | Dice | Relaxed IoU | **Occlusion-Recall** | val IoU | min |\n")
-            f.write("|---|---|---|---|---|---|---|\n")
-            for r in results:
-                f.write(f"| {r['arm']} | {r['iou']} | {r['dice']} | {r['relaxed_iou']} "
-                        f"| **{r['occlusion_recall']}** | {r['val_iou']} | {r['minutes']} |\n")
+            f.write(f"Held-out test set (300 imgs), {args.seeds} seed(s). "
+                    "Headline metric: **Occlusion-Recall** (roads recovered under shadow).\n\n")
+            f.write("| Arm | IoU | Dice | Relaxed IoU | **Occlusion-Recall** | min |\n")
+            f.write("|---|---|---|---|---|---|\n")
+            for r in agg:
+                f.write(f"| {r['arm']} | {cell(r['iou'])} | {cell(r['dice'])} "
+                        f"| {cell(r['relaxed_iou'])} | **{cell(r['occlusion_recall'])}** "
+                        f"| {r['minutes']} |\n")
         print(f"\nWrote {args.out}.csv and {args.out}.md")
         print("\nGym summary:")
-        for r in results:
-            print(f"  {r['arm']:<12} OccRecall={r['occlusion_recall']}  "
-                  f"RelaxedIoU={r['relaxed_iou']}  IoU={r['iou']}")
+        for r in agg:
+            print(f"  {r['arm']:<12} OccRecall={cell(r['occlusion_recall'])}  "
+                  f"RelaxedIoU={cell(r['relaxed_iou'])}  IoU={cell(r['iou'])}")
 
 
 if __name__ == "__main__":
