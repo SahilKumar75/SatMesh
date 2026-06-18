@@ -122,7 +122,7 @@ class RoadDS(Dataset):
 @dataclass
 class Arm:
     name: str
-    arch: str          # "unet" | "segformer"
+    arch: str          # "unet" | "segformer" | "unet_dade"
     encoder: str       # e.g. "resnet34", "mit_b0"
     use_cldice: bool
     occ_aug: bool
@@ -133,8 +133,65 @@ ARMS = {
     "baseline":    Arm("baseline",    "unet",      "resnet34", use_cldice=False, occ_aug=False),
     "cldice":      Arm("cldice",      "unet",      "resnet34", use_cldice=True,  occ_aug=True),
     "transformer": Arm("transformer", "segformer", "mit_b0",   use_cldice=True,  occ_aug=True),
-    # eo_pretrained is filled in after NotebookLM picks a remote-sensing encoder
+    # DADE = clDice arm + a differential-attention dilated bottleneck (D3FNet).
+    # Isolated against 'cldice': same encoder/loss/aug, only the bottleneck differs.
+    "dade":        Arm("dade",        "unet_dade", "resnet34", use_cldice=True,  occ_aug=True),
+    # eo_pretrained (SatlasPretrain) is a separate integration — added next.
 }
+
+
+# ── DADE bottleneck (D3FNet-style: multi-rate dilated context + differential attention) ──
+
+class DADE(nn.Module):
+    """
+    Differential Attention Dilation Extraction.
+    Cascaded dilated convs (rates 1,3,5,9) gather multi-scale road context;
+    a differential channel-attention signal (attention on context MINUS attention
+    on the identity) suppresses background that is common to both, sharpening
+    thin/occluded road structure. Lightweight, CNN-only, sits at the U-Net bottleneck.
+    """
+    def __init__(self, ch, rates=(1, 3, 5, 9)):
+        super().__init__()
+        self.branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(ch, ch, 3, padding=r, dilation=r, bias=False),
+                nn.BatchNorm2d(ch), nn.ReLU(inplace=True))
+            for r in rates])
+        self.fuse = nn.Conv2d(ch * len(rates), ch, 1, bias=False)
+        self.bn   = nn.BatchNorm2d(ch)
+        red = max(ch // 8, 8)
+        self.ca = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(ch, red, 1), nn.ReLU(inplace=True), nn.Conv2d(red, ch, 1))
+        self.sa = nn.Conv2d(2, 1, 7, padding=3)
+
+    def forward(self, x):
+        ctx = torch.cat([b(x) for b in self.branches], 1)
+        ctx = F.relu(self.bn(self.fuse(ctx)))
+        diff = self.ca(ctx) - self.ca(x)            # differential channel attention
+        y = ctx * torch.sigmoid(diff)
+        sa_in = torch.cat([y.mean(1, keepdim=True), y.max(1, keepdim=True)[0]], 1)
+        y = y * torch.sigmoid(self.sa(sa_in))       # spatial attention
+        return x + y                                # residual
+
+
+class UnetWithBottleneck(nn.Module):
+    """Wrap an smp.Unet, refining the deepest encoder feature with a bottleneck module."""
+    def __init__(self, base: smp.Unet, bottleneck: nn.Module):
+        super().__init__()
+        self.encoder = base.encoder
+        self.decoder = base.decoder
+        self.head    = base.segmentation_head
+        self.bottleneck = bottleneck
+
+    def forward(self, x):
+        feats = list(self.encoder(x))
+        feats[-1] = self.bottleneck(feats[-1])
+        try:
+            dec = self.decoder(*feats)
+        except TypeError:
+            dec = self.decoder(feats)
+        return self.head(dec)
 
 
 def build_model(arm: Arm) -> nn.Module:
@@ -142,6 +199,10 @@ def build_model(arm: Arm) -> nn.Module:
               in_channels=3, classes=1)
     if arm.arch == "segformer":
         return smp.Segformer(**kw)
+    if arm.arch == "unet_dade":
+        base = smp.Unet(**kw)
+        deepest = base.encoder.out_channels[-1]
+        return UnetWithBottleneck(base, DADE(deepest))
     return smp.Unet(**kw)
 
 
