@@ -1,9 +1,54 @@
+# ── Data & datasets ───────────────────────────────────────────────
 data/
-outputs/
+deepglobe*/
+*.zip
+*.tif
+*.tiff
+
+# ── Model checkpoints & graph artifacts ───────────────────────────
 *.pth
+*.pt
 *.gpickle
+*.onnx
+
+# ── Training / eval outputs ───────────────────────────────────────
+outputs/
 test_pairs.json
 best_model_meta.json
+epoch_metrics.json
+gym_results.*
+*_metrics.csv
+*_metrics.json
+summary.json
+criticality.json
+ps4_predictions.png
+sample_predictions.png
+training_curves.png
+resilience_curve.png
+road_mask.png
+*.log
+*_patched.py
+
+# ── graphify generated output ─────────────────────────────────────
+graphify-out/
+**/session-graph/graph.html
+*.graphml
+*.svg
+
+# ── Large binary deliverables (keep source markdown, not the export) ─
+*.pptx
+*.pdf
+
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.pyo
+.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/
+
+# ── OS / editor ───────────────────────────────────────────────────
 .DS_Store
+.vscode/
+.idea/
