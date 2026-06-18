@@ -1,10 +1,14 @@
 """
-dashboard/app.py — SatMesh interactive resilience dashboard.
+dashboard/app.py — SatMesh interactive road-network resilience dashboard.
 
-Launch:
-    streamlit run dashboard/app.py -- --graph outputs/healed_graph.gpickle
-    streamlit run dashboard/app.py -- --graph outputs/healed_graph.gpickle \\
-        --criticality outputs/criticality.json
+PS4 deliverable: Streamlit + Leaflet criticality heatmap with click-to-disable
+node simulation showing rerouting, travel-time increase, areas isolated, and a
+live Resilience Index — the "what-if disaster simulator" the problem statement asks for.
+
+Launch (defaults to the Track B outputs):
+    streamlit run dashboard/app.py
+    streamlit run dashboard/app.py -- --graph outputs/trackb/healed_graph.gpickle \\
+        --criticality outputs/trackb/criticality.json
 """
 
 from __future__ import annotations
@@ -13,29 +17,32 @@ import argparse, json, os, pickle, sys
 import folium
 import networkx as nx
 import numpy as np
+import pandas as pd
 import streamlit as st
 from scipy.spatial import cKDTree
 from streamlit_folium import st_folium
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+DEFAULT_GRAPH = "outputs/trackb/healed_graph.gpickle"
+DEFAULT_CRIT  = "outputs/trackb/criticality.json"
 
-# ── Argument parsing (passed after "--" in streamlit run) ─────────────────────
+
+# ── Args ───────────────────────────────────────────────────────────────────────
 
 def _parse_args():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--graph",       default=None)
-    parser.add_argument("--criticality", default=None)
-    # streamlit injects its own args before "--"; slice them off
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument("--graph",       default=DEFAULT_GRAPH)
+    p.add_argument("--criticality", default=DEFAULT_CRIT)
     try:
         idx = sys.argv.index("--")
-        args, _ = parser.parse_known_args(sys.argv[idx + 1:])
+        args, _ = p.parse_known_args(sys.argv[idx + 1:])
     except ValueError:
-        args, _ = parser.parse_known_args([])
+        args, _ = p.parse_known_args([])
     return args
 
 
-# ── Graph loading / caching ───────────────────────────────────────────────────
+# ── Loading / caching ───────────────────────────────────────────────────────────
 
 @st.cache_resource
 def load_graph(path: str) -> nx.Graph:
@@ -55,278 +62,202 @@ def compute_bc(_G: nx.Graph) -> dict:
     return compute_betweenness(_G)
 
 
-# ── Colour helpers ────────────────────────────────────────────────────────────
+# ── Colour: green (low) → red (high betweenness) ────────────────────────────────
 
-def _bc_colour(bc_val: float, bc_max: float) -> str:
-    """Blue (low) → Red (high) interpolation."""
-    ratio = bc_val / bc_max if bc_max > 0 else 0.0
-    r = int(255 * ratio)
-    b = int(255 * (1 - ratio))
-    return f"#{r:02x}00{b:02x}"
+def _bc_colour(v: float, vmax: float) -> str:
+    r = v / vmax if vmax > 0 else 0.0
+    red, grn = int(255 * r), int(180 * (1 - r))
+    return f"#{red:02x}{grn:02x}20"
 
 
-# ── Nearest node lookup ────────────────────────────────────────────────────────
-
-def _build_node_tree(G: nx.Graph):
-    nodes  = list(G.nodes)
-    coords = np.array([
-        [G.nodes[n].get("lat", G.nodes[n].get("y", 0)),
-         G.nodes[n].get("lon", G.nodes[n].get("x", 0))]
-        for n in nodes
-    ])
-    return nodes, coords, cKDTree(coords)
+def _node_xy(G, n):
+    d = G.nodes[n]
+    return d.get("lat", d.get("y", 0)), d.get("lon", d.get("x", 0))
 
 
-def find_nearest_node(G: nx.Graph, lat: float, lon: float) -> int | None:
-    nodes, _, tree = _build_node_tree(G)
+# ── Nearest-node lookup ─────────────────────────────────────────────────────────
+
+@st.cache_data
+def _node_arrays(_G: nx.Graph):
+    nodes = list(_G.nodes)
+    coords = np.array([_node_xy(_G, n) for n in nodes])
+    return nodes, coords
+
+
+def find_nearest_node(G, lat, lon, max_dist):
+    nodes, coords = _node_arrays(G)
+    tree = cKDTree(coords)
     dist, idx = tree.query([lat, lon])
-    if dist > 0.01:      # ~1 km sanity cap
-        return None
-    return nodes[idx]
+    return nodes[idx] if dist <= max_dist else None
 
 
-# ── Folium map builder ────────────────────────────────────────────────────────
+# ── Map ─────────────────────────────────────────────────────────────────────────
 
-def build_folium_map(
-    G: nx.Graph,
-    bc: dict,
-    disabled_nodes: list,
-    reroute_path: list,
-) -> folium.Map:
+def build_map(G, bc, disabled, reroute_path):
     bc_max = max(bc.values()) if bc else 1.0
+    coords = np.array([_node_xy(G, n) for n in G.nodes])
+    centre = (coords[:, 0].mean(), coords[:, 1].mean()) if len(coords) else (0, 0)
+    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1e-6) if len(coords) else 1
+    zoom = 15 if span < 0.02 else 13
+    m = folium.Map(location=centre, zoom_start=zoom, tiles="CartoDB positron")
 
-    # centre on graph centroid
-    lats = [G.nodes[n].get("lat", G.nodes[n].get("y", 0)) for n in G.nodes]
-    lons = [G.nodes[n].get("lon", G.nodes[n].get("x", 0)) for n in G.nodes]
-    centre = (np.mean(lats) if lats else 0.0, np.mean(lons) if lons else 0.0)
-
-    m = folium.Map(location=centre, zoom_start=15, tiles="CartoDB positron")
-
-    # draw edges
     reroute_set = set(zip(reroute_path[:-1], reroute_path[1:]))
     for u, v, data in G.edges(data=True):
-        u_lat = G.nodes[u].get("lat", G.nodes[u].get("y", 0))
-        u_lon = G.nodes[u].get("lon", G.nodes[u].get("x", 0))
-        v_lat = G.nodes[v].get("lat", G.nodes[v].get("y", 0))
-        v_lon = G.nodes[v].get("lon", G.nodes[v].get("x", 0))
+        ul = _node_xy(G, u); vl = _node_xy(G, v)
+        is_rr = (u, v) in reroute_set or (v, u) in reroute_set
+        is_syn = data.get("synthetic", False)
+        colour = "#ff7f0e" if is_rr else ("#2ca02c" if is_syn else "#bbbbbb")
+        weight = 6 if is_rr else (3 if is_syn else 1.5)
+        folium.PolyLine([ul, vl], color=colour, weight=weight, opacity=0.85).add_to(m)
 
-        is_reroute  = (u, v) in reroute_set or (v, u) in reroute_set
-        is_synth    = data.get("synthetic", False)
-        colour = "#ff7f00" if is_reroute else ("#2ca02c" if is_synth else "#aaaaaa")
-        weight = 5 if is_reroute else (3 if is_synth else 1.5)
-
-        folium.PolyLine(
-            [(u_lat, u_lon), (v_lat, v_lon)],
-            color=colour, weight=weight, opacity=0.8,
-        ).add_to(m)
-
-    # draw nodes (only top-500 by centrality to keep it snappy)
-    top_nodes = sorted(bc, key=bc.get, reverse=True)[:500]
-    for n in top_nodes:
-        lat = G.nodes[n].get("lat", G.nodes[n].get("y", 0))
-        lon = G.nodes[n].get("lon", G.nodes[n].get("x", 0))
-        is_disabled = n in disabled_nodes
-        colour = "#ff0000" if is_disabled else _bc_colour(bc.get(n, 0), bc_max)
-        radius = 8 if is_disabled else max(3, int(bc.get(n, 0) / bc_max * 8))
-
+    for n in sorted(bc, key=bc.get, reverse=True)[:500]:
+        lat, lon = _node_xy(G, n)
+        off = n in disabled
+        colour = "#000000" if off else _bc_colour(bc.get(n, 0), bc_max)
         folium.CircleMarker(
             location=(lat, lon),
-            radius=radius,
-            color=colour,
-            fill=True, fill_color=colour, fill_opacity=0.8,
-            tooltip=f"Node {n}<br>BC={bc.get(n, 0):.4f}",
+            radius=10 if off else max(3, int(bc.get(n, 0) / bc_max * 9)),
+            color=colour, weight=3 if off else 1,
+            fill=True, fill_color=colour, fill_opacity=0.9,
+            tooltip=f"Node {n} — BC {bc.get(n, 0):.3f}" + ("  (DISABLED)" if off else ""),
         ).add_to(m)
-
     return m
 
 
-# ── Quick metrics ─────────────────────────────────────────────────────────────
+# ── Helpers ─────────────────────────────────────────────────────────────────────
 
-def _lcc_size(G: nx.Graph) -> int:
-    if G.number_of_nodes() == 0:
-        return 0
-    return len(max(nx.connected_components(G), key=len))
+def _lcc(G):
+    return len(max(nx.connected_components(G), key=len)) if G.number_of_nodes() else 0
 
-
-def _resilience_index(G: nx.Graph, bc: dict) -> float:
-    if G.number_of_nodes() < 3:
-        return 1.0
-    from eval.metrics import resilience_index
-    return resilience_index(G)
-
-
-# ── Streamlit app ─────────────────────────────────────────────────────────────
 
 def main():
-    st.set_page_config(
-        page_title="SatMesh — Road Network Resilience",
-        layout="wide",
-    )
-    st.title("SatMesh — Road Network Resilience Dashboard")
+    st.set_page_config(page_title="SatMesh — Route Resilience", layout="wide")
+    st.title("SatMesh — Urban Road Network Resilience")
+    st.caption("Click a red intersection on the map to simulate its failure "
+               "(flood / accident) and watch the network degrade.")
 
     args = _parse_args()
-
-    # sidebar — graph loading
     with st.sidebar:
         st.header("Data")
-        graph_path = st.text_input("Graph (.gpickle)", value=args.graph or "")
-        crit_path  = st.text_input("Criticality JSON (optional)",
-                                   value=args.criticality or "")
-        load_btn   = st.button("Load")
-
-    if not graph_path or (not os.path.exists(graph_path) and not load_btn):
-        st.info("Enter a healed graph path in the sidebar and click **Load**.")
-        return
+        graph_path = st.text_input("Healed graph (.gpickle)", value=args.graph)
+        crit_path  = st.text_input("Criticality JSON", value=args.criticality)
 
     if not os.path.exists(graph_path):
-        st.error(f"File not found: {graph_path}")
+        st.warning(f"Graph not found: `{graph_path}`. Run `track_b/run_trackb.py` first, "
+                   "or point to a healed-graph pickle in the sidebar.")
         return
 
-    G  = load_graph(graph_path)
+    G = load_graph(graph_path)
     bc = compute_bc(G)
-    bc_sorted_nodes = sorted(bc, key=bc.get, reverse=True)
+    ranked = sorted(bc, key=bc.get, reverse=True)
+    ntype = type(ranked[0]) if ranked else int
+    crit = load_criticality(crit_path) if os.path.exists(crit_path) else None
 
-    crit_data = None
-    if crit_path and os.path.exists(crit_path):
-        crit_data = load_criticality(crit_path)
+    # coordinate scale → click tolerance (geo lat/lon vs pixel-metre grids differ hugely)
+    coords = np.array([_node_xy(G, n) for n in G.nodes])
+    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1.0)
+    click_tol = span * 0.04
 
-    # initialise session state
-    if "disabled_nodes" not in st.session_state:
-        st.session_state["disabled_nodes"] = []
-    if "reroute_path" not in st.session_state:
-        st.session_state["reroute_path"] = []
-    if "reroute_len" not in st.session_state:
-        st.session_state["reroute_len"] = None
+    ss = st.session_state
+    ss.setdefault("disabled", [])
+    ss.setdefault("reroute_path", [])
+    ss.setdefault("reroute_info", None)
 
     # ── Sidebar controls ──────────────────────────────────────────────────────
     with st.sidebar:
-        st.header("Node Controls")
-        top10 = [str(n) for n in bc_sorted_nodes[:10]]
-        selected_disable = st.multiselect(
-            "Disable nodes (top-10 by centrality pre-loaded)",
-            options=[str(n) for n in bc_sorted_nodes[:50]],
-            default=st.session_state["disabled_nodes"]
-                   if st.session_state["disabled_nodes"] else [],
-        )
-        if st.button("Apply selection"):
-            st.session_state["disabled_nodes"] = selected_disable
-            st.session_state["reroute_path"]   = []
-            st.session_state["reroute_len"]    = None
+        st.divider(); st.header("Failure simulation")
+        if st.button("⚡ Disable top 3 gatekeepers", use_container_width=True):
+            ss["disabled"] = [ranked[i] for i in range(min(3, len(ranked)))]
+            ss["reroute_path"] = []; ss["reroute_info"] = None
+            st.rerun()
+        if st.button("Clear all", use_container_width=True):
+            ss["disabled"] = []; ss["reroute_path"] = []; ss["reroute_info"] = None
             st.rerun()
 
-        if st.button("Clear disabled nodes"):
-            st.session_state["disabled_nodes"] = []
-            st.session_state["reroute_path"]   = []
-            st.session_state["reroute_len"]    = None
-            st.rerun()
-
-        st.divider()
-        st.header("Routing")
-        node_strs = [str(n) for n in G.nodes]
-        src_str   = st.selectbox("Source node",      options=node_strs, index=0)
-        dst_str   = st.selectbox("Destination node", options=node_strs,
-                                 index=min(len(node_strs) - 1, 5))
-        if st.button("Compute reroute"):
+        st.divider(); st.header("Route under disruption")
+        node_opts = [str(n) for n in G.nodes]
+        src = st.selectbox("From", node_opts, index=0)
+        dst = st.selectbox("To", node_opts, index=min(len(node_opts) - 1, 20))
+        if st.button("Compute reroute", use_container_width=True):
             from track_b.criticality import compute_reroute
-            disabled = [type(list(G.nodes)[0])(n)
-                        for n in st.session_state["disabled_nodes"]
-                        if n]
-            src = type(list(G.nodes)[0])(src_str)
-            dst = type(list(G.nodes)[0])(dst_str)
-            path, length = compute_reroute(G, disabled, src, dst)
-            st.session_state["reroute_path"] = path
-            st.session_state["reroute_len"]  = length
+            s, d = ntype(src), ntype(dst)
+            base_path, base_len = compute_reroute(G, [], s, d)
+            new_path,  new_len  = compute_reroute(G, ss["disabled"], s, d)
+            ss["reroute_path"] = new_path
+            if new_len == float("inf"):
+                ss["reroute_info"] = ("cut", base_len, None)
+            else:
+                inc = (new_len - base_len) / base_len * 100 if base_len > 0 else 0
+                ss["reroute_info"] = ("ok", base_len, (new_len, inc))
             st.rerun()
 
-    # ── Metric bar ────────────────────────────────────────────────────────────
-    disabled_ids = st.session_state["disabled_nodes"]
+    disabled = [ntype(n) for n in ss["disabled"]]
     G_active = G.copy()
-    for n in disabled_ids:
-        try:
-            G_active.remove_node(type(list(G.nodes)[0])(n))
-        except Exception:
-            pass
+    G_active.remove_nodes_from([n for n in disabled if G_active.has_node(n)])
 
-    lcc_base   = _lcc_size(G)
-    lcc_active = _lcc_size(G_active)
-    ri = None
-    if G.number_of_nodes() >= 3:
-        try:
-            from eval.metrics import resilience_index
-            ri = resilience_index(G)
-        except Exception:
-            pass
+    lcc_base, lcc_act = _lcc(G), _lcc(G_active)
+    isolated = lcc_base - lcc_act
+    components = nx.number_connected_components(G_active) if G_active.number_of_nodes() else 0
+    retained = lcc_act / lcc_base * 100 if lcc_base else 0
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total nodes",    G.number_of_nodes())
-    col2.metric("LCC (baseline)", lcc_base)
-    col3.metric("LCC (active)",   lcc_active,
-                delta=lcc_active - lcc_base if disabled_ids else None)
-    col4.metric("Resilience Index", f"{ri:.3f}" if ri is not None else "–")
+    # ── Impact readout ────────────────────────────────────────────────────────
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Intersections", G.number_of_nodes())
+    c2.metric("Disabled", len(disabled))
+    c3.metric("Connected reach", f"{retained:.0f}%",
+              delta=f"{retained - 100:.0f}%" if disabled else None,
+              delta_color="inverse")
+    c4.metric("Intersections isolated", isolated, delta=isolated if disabled else None,
+              delta_color="inverse")
+    c5.metric("Separate areas", components)
 
-    if st.session_state["reroute_len"] is not None:
-        rlen = st.session_state["reroute_len"]
-        st.info(
-            f"Reroute: {len(st.session_state['reroute_path'])} nodes, "
-            f"length = {'∞' if rlen == float('inf') else f'{rlen:.1f} m'}"
-        )
+    info = ss["reroute_info"]
+    if info:
+        if info[0] == "cut":
+            st.error(f"🚧 Route severed — destination is unreachable after the failure "
+                     f"(baseline was {info[1]:.0f} m).")
+        else:
+            base_len, (new_len, inc) = info[1], info[2]
+            st.warning(f"↪ Detour required: travel distance **{base_len:.0f} m → {new_len:.0f} m**, "
+                       f"a **+{inc:.0f}%** increase in travel time.")
 
-    # ── Map + charts ──────────────────────────────────────────────────────────
-    map_col, chart_col = st.columns([3, 1])
-
+    # ── Map + side panels ─────────────────────────────────────────────────────
+    map_col, side = st.columns([3, 1])
     with map_col:
-        st.subheader("Network Map")
-        st.caption(
-            "Gray = road edge  |  Green = healed/synthetic  |  Orange = reroute path  "
-            "| Red node = disabled  |  Blue→Red = low→high betweenness"
+        st.caption("Node colour = betweenness (green low → red gatekeeper) · "
+                   "black = disabled · green lines = healed bridges · orange = reroute")
+        fmap = build_map(G, bc, disabled, ss["reroute_path"])
+        md = st_folium(fmap, width=None, height=560, key="map")
+        clk = (md or {}).get("last_object_clicked")
+        if clk and clk.get("lat") is not None:
+            near = find_nearest_node(G, clk["lat"], clk["lng"], click_tol)
+            if near is not None and near not in disabled:
+                ss["disabled"].append(near)
+                ss["reroute_path"] = []; ss["reroute_info"] = None
+                st.rerun()
+
+    with side:
+        st.subheader("Top Gatekeeper Nodes")
+        st.dataframe(
+            pd.DataFrame([(str(n), round(bc[n], 3)) for n in ranked[:10]],
+                         columns=["node", "betweenness"]).set_index("node"),
+            use_container_width=True,
         )
-        fmap = build_folium_map(
-            G, bc,
-            [type(list(G.nodes)[0])(n) for n in disabled_ids if n],
-            st.session_state["reroute_path"],
-        )
-        map_data = st_folium(fmap, width=None, height=550, key="main_map")
-
-        # click-to-disable
-        clicked = map_data.get("last_object_clicked")
-        if clicked:
-            lat = clicked.get("lat")
-            lon = clicked.get("lng")
-            if lat is not None and lon is not None:
-                nearest = find_nearest_node(G, lat, lon)
-                if nearest is not None:
-                    n_str = str(nearest)
-                    if n_str not in st.session_state["disabled_nodes"]:
-                        st.session_state["disabled_nodes"].append(n_str)
-                        st.session_state["reroute_path"] = []
-                        st.session_state["reroute_len"]  = None
-                        st.rerun()
-
-    with chart_col:
-        st.subheader("Centrality")
-        import pandas as pd
-        top15 = [(str(n), bc[n]) for n in bc_sorted_nodes[:15]]
-        df_bc = pd.DataFrame(top15, columns=["node", "BC"])
-        df_bc = df_bc.set_index("node")
-        st.bar_chart(df_bc)
-
-        if crit_data and "ablation" in crit_data:
-            st.subheader("Resilience Curve")
-            abl   = crit_data["ablation"]
-            df_ri = pd.DataFrame({
-                "n_removed":       [r["n_removed"]        for r in abl],
-                "resilience_index": [r["resilience_index"] for r in abl],
-            }).set_index("n_removed")
-            st.line_chart(df_ri)
-
-    # ── Raw ablation table ────────────────────────────────────────────────────
-    if crit_data and "ablation" in crit_data:
-        with st.expander("Ablation detail"):
-            import pandas as pd
-            st.dataframe(
-                pd.DataFrame(crit_data["ablation"]).set_index("n_removed"),
-                use_container_width=True,
+        if crit and "ablation" in crit:
+            st.subheader("Resilience under attack")
+            abl = crit["ablation"]
+            st.line_chart(
+                pd.DataFrame({
+                    "Resilience Index": [r["resilience_index"] for r in abl],
+                    "Connected fraction": [r["lcc_fraction"] for r in abl],
+                }, index=[r["n_removed"] for r in abl])
             )
+            st.caption("Adaptive betweenness attack — both fall as gatekeepers are removed.")
+
+    if crit and "ablation" in crit:
+        with st.expander("Ablation detail (per-node removal)"):
+            st.dataframe(pd.DataFrame(crit["ablation"]).set_index("n_removed"),
+                         use_container_width=True)
 
 
 if __name__ == "__main__":
