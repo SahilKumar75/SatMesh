@@ -176,7 +176,7 @@ def main():
 
     # click tolerance from the projected geo extent
     coords = np.array([geo[n] for n in G.nodes])
-    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1e-6)
+    span = max(np.ptp(coords[:, 0]), np.ptp(coords[:, 1]), 1e-6)
     click_tol = span * 0.04
 
     ss = st.session_state
