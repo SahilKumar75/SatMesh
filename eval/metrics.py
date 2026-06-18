@@ -225,23 +225,37 @@ def topological_accuracy(
     return float(np.mean(finite)) if finite else float("inf")
 
 
+def _global_efficiency(G: nx.Graph, weight: str = "length") -> float:
+    """Weighted global efficiency; disconnected pairs contribute 0 (fragmentation-aware)."""
+    n = G.number_of_nodes()
+    if n < 2:
+        return 0.0
+    total = 0.0
+    for _, lengths in nx.all_pairs_dijkstra_path_length(G, weight=weight):
+        for d in lengths.values():
+            if d > 0:
+                total += 1.0 / d
+    return total / (n * (n - 1))
+
+
 def resilience_index(G: nx.Graph, weight: str = "length") -> float:
     """
     Remove the single highest-betweenness node and compute
-    baseline_avg_path / perturbed_avg_path.
-    Lower value = network degrades more after the removal.
+    efficiency(perturbed) / efficiency(baseline) using global efficiency.
+    Value in [0, 1]; LOWER = network degrades more after the removal.
+    Global efficiency (not avg-path-over-LCC) so fragmentation reads as degradation.
     """
     if G.number_of_nodes() < 3:
         return 1.0
     bc = nx.betweenness_centrality(G, weight=weight, k=min(len(G), 300), seed=42)
     worst = max(bc, key=bc.get)
-    base  = _avg_path_lcc(G, weight)
-    G2    = G.copy()
+    base  = _global_efficiency(G, weight)
+    if base == 0:
+        return 1.0
+    G2 = G.copy()
     G2.remove_node(worst)
-    after = _avg_path_lcc(G2, weight)
-    if after == 0:
-        return 0.0
-    return float(base / after)
+    after = _global_efficiency(G2, weight)
+    return float(after / base)
 
 
 def evaluate_track_b(

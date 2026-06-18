@@ -32,6 +32,24 @@ def _avg_path(G: nx.Graph, weight: str = "length") -> float:
     return nx.average_shortest_path_length(H, weight=weight)
 
 
+def global_efficiency(G: nx.Graph, weight: str = "length") -> float:
+    """
+    Weighted global efficiency = mean over all ordered node pairs of 1/d(u,v),
+    with disconnected pairs contributing 0. Unlike average-path-over-LCC this
+    DROPS when the network fragments, so it correctly measures resilience under
+    targeted attack (PS4: "recompute global efficiency after each node removal").
+    """
+    n = G.number_of_nodes()
+    if n < 2:
+        return 0.0
+    total = 0.0
+    for _, lengths in nx.all_pairs_dijkstra_path_length(G, weight=weight):
+        for d in lengths.values():
+            if d > 0:
+                total += 1.0 / d
+    return total / (n * (n - 1))
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def compute_betweenness(
@@ -51,51 +69,56 @@ def compute_betweenness(
 
 def ablation_curve(
     G: nx.Graph,
-    bc: dict[Any, float],
+    bc: dict[Any, float] | None = None,
     max_removals: int = 10,
+    weight: str = "length",
+    adaptive: bool = True,
 ) -> list[dict]:
     """
-    Remove nodes one by one in decreasing betweenness order.
-    Returns a list of per-step metric dicts.
-    """
-    baseline_path = _avg_path(G)
-    total_nodes   = G.number_of_nodes()
+    Adaptive targeted-attack ablation. At each step the highest-betweenness node
+    in the CURRENT graph is removed and betweenness is recomputed (PS4 spec).
 
-    # sort descending by centrality
-    ranked = sorted(bc, key=bc.get, reverse=True)
+    resilience_index = efficiency(current) / efficiency(baseline): starts at 1.0
+    and DECREASES toward 0 as the network degrades. Lower = more vulnerable.
+    """
+    total_nodes = G.number_of_nodes()
+    base_eff = global_efficiency(G, weight)
 
     results: list[dict] = [{
-        "n_removed":       0,
-        "node_id":         None,
-        "betweenness":     None,
-        "lcc_size":        _lcc(G).number_of_nodes(),
-        "lcc_fraction":    _lcc(G).number_of_nodes() / max(total_nodes, 1),
-        "avg_path_m":      baseline_path,
+        "n_removed":        0,
+        "node_id":          None,
+        "betweenness":      None,
+        "lcc_size":         _lcc(G).number_of_nodes(),
+        "lcc_fraction":     _lcc(G).number_of_nodes() / max(total_nodes, 1),
+        "efficiency":       base_eff,
         "resilience_index": 1.0,
     }]
 
     G_work = G.copy()
-    removed: list[Any] = []
-
     for step in range(1, max_removals + 1):
-        # pick the next highest-BC node that still exists
-        node = next((n for n in ranked if n in G_work and n not in removed), None)
-        if node is None:
+        if G_work.number_of_nodes() < 2:
             break
-        removed.append(node)
+        # recompute betweenness on the current graph (adaptive attack)
+        if adaptive or bc is None:
+            cur_bc = compute_betweenness(G_work, weight=weight)
+        else:
+            cur_bc = {n: bc[n] for n in G_work if n in bc}
+        if not cur_bc:
+            break
+        node = max(cur_bc, key=cur_bc.get)
+        node_bc = float(cur_bc[node])
         G_work.remove_node(node)
 
-        lcc_sz  = _lcc(G_work).number_of_nodes()
-        avg_p   = _avg_path(G_work)
-        ri      = float(baseline_path / avg_p) if avg_p > 0 else 0.0
+        eff = global_efficiency(G_work, weight)
+        lcc_sz = _lcc(G_work).number_of_nodes()
         results.append({
-            "n_removed":       step,
-            "node_id":         int(node) if isinstance(node, (int, np.integer)) else node,
-            "betweenness":     float(bc[node]),
-            "lcc_size":        lcc_sz,
-            "lcc_fraction":    lcc_sz / max(total_nodes, 1),
-            "avg_path_m":      avg_p,
-            "resilience_index": ri,
+            "n_removed":        step,
+            "node_id":          int(node) if isinstance(node, (int, np.integer)) else node,
+            "betweenness":      node_bc,
+            "lcc_size":         lcc_sz,
+            "lcc_fraction":     lcc_sz / max(total_nodes, 1),
+            "efficiency":       eff,
+            "resilience_index": float(eff / base_eff) if base_eff > 0 else 0.0,
         })
 
     return results
@@ -133,14 +156,15 @@ def plot_ablation_curve(results: list[dict], output_path: str) -> None:
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
     ax1.plot(steps, ri, marker="o", color="#d62728", linewidth=2)
-    ax1.set_xlabel("Nodes removed (by betweenness rank)")
-    ax1.set_ylabel("Resilience Index (baseline / current avg path)")
-    ax1.set_title("Resilience Index")
+    ax1.set_ylim(0, 1.05)
+    ax1.set_xlabel("Nodes removed (adaptive betweenness attack)")
+    ax1.set_ylabel("Resilience Index (efficiency / baseline efficiency)")
+    ax1.set_title("Resilience Index — lower = more degraded")
     ax1.grid(True, alpha=0.3)
 
     ax2.plot(steps, lcc_fr, marker="s", color="#1f77b4", linewidth=2)
     ax2.set_ylim(0, 1.05)
-    ax2.set_xlabel("Nodes removed (by betweenness rank)")
+    ax2.set_xlabel("Nodes removed (adaptive betweenness attack)")
     ax2.set_ylabel("LCC fraction")
     ax2.set_title("Largest Connected Component")
     ax2.grid(True, alpha=0.3)
