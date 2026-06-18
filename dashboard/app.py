@@ -62,6 +62,33 @@ def compute_bc(_G: nx.Graph) -> dict:
     return compute_betweenness(_G)
 
 
+# ── Geo projection ──────────────────────────────────────────────────────────────
+# Leaflet needs real lat/lon. Pixel-grid graphs (row/col) are projected onto a
+# placeholder city (Bengaluru, per the PS4 wireframe) so the network renders on a
+# real basemap. If the graph already carries valid lat/lon, those are used as-is.
+
+CITY_CENTER = (12.9716, 77.5946)   # Bengaluru
+CITY_SPAN_DEG = 0.045              # ~5 km tile
+
+
+@st.cache_data
+def geo_project(_G: nx.Graph) -> dict:
+    nodes = list(_G.nodes)
+    lats = np.array([_G.nodes[n].get("lat", np.nan) for n in nodes])
+    if np.all(np.isfinite(lats)) and np.nanmax(np.abs(lats)) <= 90:
+        return {n: (float(_G.nodes[n]["lat"]), float(_G.nodes[n]["lon"])) for n in nodes}
+    # project pixel row/col into a lat/lon box around the city centre
+    rows = np.array([_G.nodes[n].get("row", _G.nodes[n].get("y", 0)) for n in nodes], float)
+    cols = np.array([_G.nodes[n].get("col", _G.nodes[n].get("x", 0)) for n in nodes], float)
+    r0, r1 = rows.min(), rows.max()
+    c0, c1 = cols.min(), cols.max()
+    rr = (rows - r0) / (r1 - r0 + 1e-9)
+    cc = (cols - c0) / (c1 - c0 + 1e-9)
+    lat = CITY_CENTER[0] + CITY_SPAN_DEG * (0.5 - rr)   # row increases southward
+    lon = CITY_CENTER[1] + CITY_SPAN_DEG * (cc - 0.5)
+    return {n: (float(lat[i]), float(lon[i])) for i, n in enumerate(nodes)}
+
+
 # ── Colour: green (low) → red (high betweenness) ────────────────────────────────
 
 def _bc_colour(v: float, vmax: float) -> str:
@@ -70,22 +97,17 @@ def _bc_colour(v: float, vmax: float) -> str:
     return f"#{red:02x}{grn:02x}20"
 
 
-def _node_xy(G, n):
-    d = G.nodes[n]
-    return d.get("lat", d.get("y", 0)), d.get("lon", d.get("x", 0))
-
-
 # ── Nearest-node lookup ─────────────────────────────────────────────────────────
 
 @st.cache_data
-def _node_arrays(_G: nx.Graph):
+def _node_arrays(_G: nx.Graph, _geo: dict):
     nodes = list(_G.nodes)
-    coords = np.array([_node_xy(_G, n) for n in nodes])
+    coords = np.array([_geo[n] for n in nodes])
     return nodes, coords
 
 
-def find_nearest_node(G, lat, lon, max_dist):
-    nodes, coords = _node_arrays(G)
+def find_nearest_node(G, geo, lat, lon, max_dist):
+    nodes, coords = _node_arrays(G, geo)
     tree = cKDTree(coords)
     dist, idx = tree.query([lat, lon])
     return nodes[idx] if dist <= max_dist else None
@@ -93,17 +115,15 @@ def find_nearest_node(G, lat, lon, max_dist):
 
 # ── Map ─────────────────────────────────────────────────────────────────────────
 
-def build_map(G, bc, disabled, reroute_path):
+def build_map(G, geo, bc, disabled, reroute_path):
     bc_max = max(bc.values()) if bc else 1.0
-    coords = np.array([_node_xy(G, n) for n in G.nodes])
-    centre = (coords[:, 0].mean(), coords[:, 1].mean()) if len(coords) else (0, 0)
-    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1e-6) if len(coords) else 1
-    zoom = 15 if span < 0.02 else 13
-    m = folium.Map(location=centre, zoom_start=zoom, tiles="CartoDB positron")
+    coords = np.array([geo[n] for n in G.nodes])
+    centre = (coords[:, 0].mean(), coords[:, 1].mean()) if len(coords) else CITY_CENTER
+    m = folium.Map(location=centre, zoom_start=15, tiles="CartoDB positron")
 
     reroute_set = set(zip(reroute_path[:-1], reroute_path[1:]))
     for u, v, data in G.edges(data=True):
-        ul = _node_xy(G, u); vl = _node_xy(G, v)
+        ul = geo[u]; vl = geo[v]
         is_rr = (u, v) in reroute_set or (v, u) in reroute_set
         is_syn = data.get("synthetic", False)
         colour = "#ff7f0e" if is_rr else ("#2ca02c" if is_syn else "#bbbbbb")
@@ -111,7 +131,7 @@ def build_map(G, bc, disabled, reroute_path):
         folium.PolyLine([ul, vl], color=colour, weight=weight, opacity=0.85).add_to(m)
 
     for n in sorted(bc, key=bc.get, reverse=True)[:500]:
-        lat, lon = _node_xy(G, n)
+        lat, lon = geo[n]
         off = n in disabled
         colour = "#000000" if off else _bc_colour(bc.get(n, 0), bc_max)
         folium.CircleMarker(
@@ -149,13 +169,14 @@ def main():
 
     G = load_graph(graph_path)
     bc = compute_bc(G)
+    geo = geo_project(G)
     ranked = sorted(bc, key=bc.get, reverse=True)
     ntype = type(ranked[0]) if ranked else int
     crit = load_criticality(crit_path) if os.path.exists(crit_path) else None
 
-    # coordinate scale → click tolerance (geo lat/lon vs pixel-metre grids differ hugely)
-    coords = np.array([_node_xy(G, n) for n in G.nodes])
-    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1.0)
+    # click tolerance from the projected geo extent
+    coords = np.array([geo[n] for n in G.nodes])
+    span = max(coords[:, 0].ptp(), coords[:, 1].ptp(), 1e-6)
     click_tol = span * 0.04
 
     ss = st.session_state
@@ -226,11 +247,11 @@ def main():
     with map_col:
         st.caption("Node colour = betweenness (green low → red gatekeeper) · "
                    "black = disabled · green lines = healed bridges · orange = reroute")
-        fmap = build_map(G, bc, disabled, ss["reroute_path"])
+        fmap = build_map(G, geo, bc, disabled, ss["reroute_path"])
         md = st_folium(fmap, width=None, height=560, key="map")
         clk = (md or {}).get("last_object_clicked")
         if clk and clk.get("lat") is not None:
-            near = find_nearest_node(G, clk["lat"], clk["lng"], click_tol)
+            near = find_nearest_node(G, geo, clk["lat"], clk["lng"], click_tol)
             if near is not None and near not in disabled:
                 ss["disabled"].append(near)
                 ss["reroute_path"] = []; ss["reroute_info"] = None
