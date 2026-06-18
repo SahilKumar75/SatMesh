@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SatMesh — Bengaluru Route Resilience</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ===== Top bar ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="glyph" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="5" cy="6" r="2"></circle>
+            <circle cx="19" cy="5" r="2"></circle>
+            <circle cx="12" cy="13" r="2.4"></circle>
+            <circle cx="6" cy="19" r="2"></circle>
+            <circle cx="18" cy="18" r="2"></circle>
+            <path d="M6.6 7.3 10 11.4M17.4 6.3 13.6 11.2M11 14.6 7.4 17.6M13.3 14.4 16.6 16.7" stroke-linecap="round"></path>
+          </svg>
+        </span>
+        SatMesh
+        <span class="sub">Urban Road Resilience</span>
+      </div>
+
+      <nav class="nav">
+        <a href="#" class="active">Overview</a>
+        <a href="#">Network</a>
+        <a href="#">Gatekeepers</a>
+        <a href="#">About</a>
+      </nav>
+
+      <div class="spacer"></div>
+
+      <div class="status-chip">
+        <span class="dot"></span>
+        Bengaluru &middot; Live Stress Test
+      </div>
+    </header>
+
+    <!-- ===== Body ===== -->
+    <div class="layout">
+
+      <!-- ----- Sidebar ----- -->
+      <aside class="sidebar">
+
+        <!-- Network status -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Network Status</h2>
+            <span class="tag" id="status-tag">NOMINAL</span>
+          </div>
+          <div class="card-body">
+            <div class="reach">
+              <div class="big tnum"><span id="reach-pct">100.0</span><span class="pct">%</span></div>
+              <div class="label">Connected reach<br/>of baseline core</div>
+            </div>
+            <div class="gauge"><div class="fill" id="reach-bar" style="width:100%"></div></div>
+
+            <div class="metric-grid">
+              <div class="metric" id="m-isolated">
+                <div class="v tnum">0</div>
+                <div class="k">Intersections isolated</div>
+              </div>
+              <div class="metric" id="m-areas">
+                <div class="v tnum">1</div>
+                <div class="k">Separate areas</div>
+              </div>
+              <div class="metric" id="m-disabled">
+                <div class="v tnum">0</div>
+                <div class="k">Nodes disabled</div>
+              </div>
+              <div class="metric" id="m-lcc">
+                <div class="v tnum">451</div>
+                <div class="k">Largest component</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Gatekeepers -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Top Gatekeeper Nodes</h2>
+            <span class="tag">BETWEENNESS</span>
+          </div>
+          <div class="card-body" style="padding:8px 12px 12px;">
+            <div class="gk-list" id="gk-list"><!-- populated by JS --></div>
+          </div>
+        </section>
+
+        <!-- Resilience chart -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Resilience Under Attack</h2>
+            <span class="tag">ABLATION</span>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="ablation-chart"></canvas>
+            </div>
+            <div class="chart-legend">
+              <span><i class="swatch" style="background:#38bdf8"></i> Resilience index</span>
+              <span><i class="swatch" style="background:#f59e0b"></i> Connected fraction</span>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <!-- ----- Main ----- -->
+      <main class="main">
+
+        <div class="map-shell">
+          <div id="map"></div>
+
+          <!-- toolbar overlay -->
+          <div class="toolbar">
+            <div class="tb-group">
+              <button class="btn danger" id="btn-top3">Disable Top 3 Gatekeepers</button>
+              <button class="btn ghost" id="btn-reset">Reset Network</button>
+            </div>
+            <div class="tb-group">
+              <span class="lab">Reroute</span>
+              <select class="sel" id="sel-from" aria-label="From node"></select>
+              <span class="lab">→</span>
+              <select class="sel" id="sel-to" aria-label="To node"></select>
+              <button class="btn accent" id="btn-route">Compute</button>
+            </div>
+          </div>
+
+          <!-- legend -->
+          <div class="legend">
+            <span class="item">Betweenness <i class="ramp"></i></span>
+            <span class="item"><i class="dotmk" style="background:#000;box-shadow:0 0 0 2px #f43f5e inset"></i> Disabled</span>
+            <span class="item"><i class="linemk" style="background:#22c55e"></i> Healed bridge</span>
+            <span class="item"><i class="linemk" style="background:#f59e0b"></i> Reroute</span>
+          </div>
+
+          <!-- reroute readout -->
+          <div class="reroute-panel" id="rr-panel">
+            <h3>Reroute Result <span class="x" id="rr-close">✕</span></h3>
+            <div id="rr-ok">
+              <div class="rr-row"><span class="k">Path</span><span class="v tnum" id="rr-path">—</span></div>
+              <div class="rr-row"><span class="k">Travel distance</span><span class="v tnum" id="rr-dist">—</span></div>
+              <div class="rr-row"><span class="k">Baseline distance</span><span class="v tnum" id="rr-base">—</span></div>
+              <div class="rr-row"><span class="k">Detour penalty</span><span class="v tnum up" id="rr-delta">—</span></div>
+            </div>
+            <div class="rr-sev" id="rr-sev" style="display:none;">
+              <span>●</span> Route severed — destination unreachable
+            </div>
+          </div>
+        </div>
+
+        <!-- ablation table -->
+        <section class="card table-card">
+          <div class="card-head">
+            <h2>Sequential Gatekeeper Ablation</h2>
+            <span class="tag">STRESS LOG</span>
+          </div>
+          <div class="tbl-scroll">
+            <table class="ablation">
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>Node removed</th>
+                  <th>Largest comp.</th>
+                  <th>Connected fraction</th>
+                  <th>Efficiency</th>
+                  <th>Resilience index</th>
+                </tr>
+              </thead>
+              <tbody id="ablation-body"><!-- populated by JS --></tbody>
+            </table>
+          </div>
+          <div class="foot-note">
+            Adaptive betweenness re-ranking · LCC baseline <b>451</b> intersections ·
+            <span id="foot-meta">582 nodes / 455 edges / 218 healed bridges</span>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Data (already inlined; do not modify) -->
+  <script src="data.js"></script>
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
