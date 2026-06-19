@@ -655,8 +655,61 @@
     document.getElementById("btn-satellite").addEventListener("click", () => switchTileMode("satellite"));
     document.getElementById("btn-street").addEventListener("click",    () => switchTileMode("street"));
 
+    // Before/after compare slider
+    initCompare();
+
     // Map settle
     setTimeout(() => map.invalidateSize(), 200);
+  }
+
+  function initCompare() {
+    const range    = document.getElementById("cmp-range");
+    const after    = document.getElementById("cmp-after");
+    const divider  = document.getElementById("cmp-divider");
+    const handle   = document.getElementById("cmp-handle");
+    const wrap     = document.getElementById("compare-wrap");
+    if (!range || !after) return;
+
+    function setPos(pct) {
+      pct = Math.max(0, Math.min(100, pct));
+      after.style.clipPath  = `inset(0 ${100 - pct}% 0 0)`;
+      divider.style.left    = `${pct}%`;
+      handle.style.left     = `${pct}%`;
+      // update range track gradient
+      range.style.background =
+        `linear-gradient(to right, var(--accent) ${pct}%, rgba(60,60,67,0.15) ${pct}%)`;
+      range.value = pct;
+    }
+
+    range.addEventListener("input", () => setPos(Number(range.value)));
+
+    // Drag handle directly on the image
+    let dragging = false;
+    handle.addEventListener("pointerdown", e => {
+      dragging = true; handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const r   = wrap.getBoundingClientRect();
+      const pct = ((e.clientX - r.left) / r.width) * 100;
+      setPos(pct);
+    });
+    handle.addEventListener("pointerup", () => { dragging = false; });
+
+    // File loaders
+    function loadFile(inputId, layerId) {
+      document.getElementById(inputId).addEventListener("change", function() {
+        const file = this.files[0];
+        if (!file) return;
+        const url  = URL.createObjectURL(file);
+        const layer = document.getElementById(layerId);
+        layer.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+      });
+    }
+    loadFile("cmp-file-before", "cmp-before");
+    loadFile("cmp-file-after",  "cmp-after");
+
+    setPos(50);
   }
 
   if (document.readyState === "loading") {

@@ -353,6 +353,34 @@ def _metric_card(col, label, value, delta=None, good=None):
     )
 
 
+def _graph_to_geojson(G: "nx.Graph", geo: dict, bc: dict) -> str:
+    """Serialise road graph to GeoJSON FeatureCollection (nodes + edges)."""
+    features = []
+    for n, (lat, lon) in geo.items():
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            "properties": {"id": n, "betweenness": round(bc.get(n, 0.0), 6)},
+        })
+    for u, v, data in G.edges(data=True):
+        if u not in geo or v not in geo:
+            continue
+        ul, vl = geo[u], geo[v]
+        features.append({
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[ul[1], ul[0]], [vl[1], vl[0]]],
+            },
+            "properties": {
+                "from": u, "to": v,
+                "weight": round(data.get("weight", 1.0), 4),
+                "synthetic": bool(data.get("synthetic", False)),
+            },
+        })
+    return json.dumps({"type": "FeatureCollection", "features": features}, indent=2)
+
+
 def main():
     st.set_page_config(
         page_title="SatMesh — Route Resilience",
@@ -539,7 +567,7 @@ def main():
                     "Resilience Index": [r["resilience_index"] for r in abl],
                     "Connected fraction": [r["lcc_fraction"] for r in abl],
                 }, index=[r["n_removed"] for r in abl]),
-                color=["#38bdf8", "#f59e0b"],
+                color=["#007AFF", "#FF9500"],
             )
             st.caption("Adaptive betweenness attack — both fall as gatekeepers are removed.")
 
@@ -549,7 +577,7 @@ def main():
             st.dataframe(abl_df, use_container_width=True)
 
         st.divider()
-        dl1, dl2 = st.columns(2)
+        dl1, dl2, dl3 = st.columns(3)
         with dl1:
             st.download_button(
                 "⬇ Download ablation CSV",
@@ -567,6 +595,15 @@ def main():
                 mime="application/json",
                 use_container_width=True,
                 help="Full betweenness centrality + ablation data as JSON",
+            )
+        with dl3:
+            st.download_button(
+                "⬇ Download road graph GeoJSON",
+                data=_graph_to_geojson(G, geo, bc),
+                file_name="satmesh_road_graph.geojson",
+                mime="application/geo+json",
+                use_container_width=True,
+                help="Road network as GeoJSON — nodes (Points) + edges (LineStrings) with betweenness attributes",
             )
 
 
