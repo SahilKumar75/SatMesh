@@ -1,0 +1,15 @@
+{
+  "id": "sahilksingh/satmesh-dlinknet-train",
+  "title": "SatMesh D-LinkNet Train",
+  "code_file": "satmesh_train.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "balraj98/deepglobe-road-extraction-dataset"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
