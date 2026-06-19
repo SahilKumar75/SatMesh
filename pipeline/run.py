@@ -107,10 +107,18 @@ def run_pipeline(
     mask = postprocess_mask(mask)
 
     import cv2
+    from track_a.infer import canopy_uncertainty_mask
     mask_path = os.path.join(output_dir, "road_mask.png")
     cv2.imwrite(mask_path, mask)
     summary["outputs"]["road_mask"] = mask_path
     print(f"  saved → {mask_path}")
+
+    raw_img = cv2.imread(input_image)
+    if raw_img is not None:
+        canopy_path = os.path.join(output_dir, "canopy_uncertainty.png")
+        cv2.imwrite(canopy_path, canopy_uncertainty_mask(raw_img))
+        summary["outputs"]["canopy_uncertainty"] = canopy_path
+        print(f"  saved → {canopy_path}")
 
     # ── Step 2: Skeleton extraction + gap healing ─────────────────────────────
     print("\n[pipeline] Step 2 — Skeleton extraction + gap healing")

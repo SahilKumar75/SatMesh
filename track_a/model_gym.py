@@ -130,14 +130,103 @@ class Arm:
 
 
 ARMS = {
-    "baseline":    Arm("baseline",    "unet",      "resnet34", use_cldice=False, occ_aug=False),
-    "cldice":      Arm("cldice",      "unet",      "resnet34", use_cldice=True,  occ_aug=True),
-    "transformer": Arm("transformer", "segformer", "mit_b0",   use_cldice=True,  occ_aug=True),
-    # DADE = clDice arm + a differential-attention dilated bottleneck (D3FNet).
+    "baseline":    Arm("baseline",    "unet",       "resnet34", use_cldice=False, occ_aug=False),
+    "cldice":      Arm("cldice",      "unet",       "resnet34", use_cldice=True,  occ_aug=True),
+    "transformer": Arm("transformer", "segformer",  "mit_b0",   use_cldice=True,  occ_aug=True),
+    # DADE = clDice arm + differential-attention dilated bottleneck (D3FNet).
     # Isolated against 'cldice': same encoder/loss/aug, only the bottleneck differs.
-    "dade":        Arm("dade",        "unet_dade", "resnet34", use_cldice=True,  occ_aug=True),
+    "dade":        Arm("dade",        "unet_dade",  "resnet34", use_cldice=True,  occ_aug=True),
+    # D-LinkNet = ASPP center block + skip-feature link convs at every encoder level.
+    # Comparison against 'dade': both use clDice + occ_aug; only the architecture differs.
+    "dlink":       Arm("dlink",       "unet_dlink", "resnet34", use_cldice=True,  occ_aug=True),
     # eo_pretrained (SatlasPretrain) is a separate integration — added next.
 }
+
+
+# ── ASPP (DeepLab v3 / D-LinkNet center block) ───────────────────────────────
+
+class ASPP(nn.Module):
+    """
+    Atrous Spatial Pyramid Pooling with 5 parallel branches (rates 1,6,12,18 +
+    global avg pool) — the center block from D-LinkNet and DeepLab v3.
+    Captures roads at multiple spatial scales and merges into a single feature.
+    """
+    def __init__(self, ch: int, rates=(1, 6, 12, 18)):
+        super().__init__()
+        self.branches = nn.ModuleList()
+        for r in rates:
+            if r == 1:
+                b = nn.Sequential(
+                    nn.Conv2d(ch, ch, 1, bias=False),
+                    nn.BatchNorm2d(ch), nn.ReLU(inplace=True))
+            else:
+                b = nn.Sequential(
+                    nn.Conv2d(ch, ch, 3, padding=r, dilation=r, bias=False),
+                    nn.BatchNorm2d(ch), nn.ReLU(inplace=True))
+            self.branches.append(b)
+        self.gap = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(ch, ch, 1, bias=False),
+            nn.BatchNorm2d(ch), nn.ReLU(inplace=True))
+        self.project = nn.Sequential(
+            nn.Conv2d(ch * (len(rates) + 1), ch, 1, bias=False),
+            nn.BatchNorm2d(ch), nn.ReLU(inplace=True),
+            nn.Dropout2d(0.10))
+
+    def forward(self, x):
+        h, w = x.shape[2:]
+        parts = [b(x) for b in self.branches]
+        gap   = F.interpolate(self.gap(x), size=(h, w), mode="bilinear", align_corners=False)
+        parts.append(gap)
+        return x + self.project(torch.cat(parts, 1))   # residual
+
+
+# ── Link module (D-LinkNet skip-connection refinement) ────────────────────────
+
+class LinkConv(nn.Module):
+    """
+    D-LinkNet link: a 1×1 residual conv that refines each encoder skip feature
+    before the decoder concatenates it. Lets the network learn which spatial
+    context to pass down at each scale.
+    """
+    def __init__(self, ch: int):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(ch, ch, 1, bias=False),
+            nn.BatchNorm2d(ch), nn.ReLU(inplace=True))
+
+    def forward(self, x):
+        return x + self.conv(x)
+
+
+class UnetDLink(nn.Module):
+    """
+    D-LinkNet: smp.Unet backbone + ASPP at the bottleneck + LinkConv on every
+    intermediate skip feature. Vs DADE (single bottleneck module):
+      - ASPP spans 4 dilation rates + global avg pool → richer multi-scale context
+      - Link modules gate what the decoder sees from each encoder level
+    Drop-in replacement for smp.Unet in build_model().
+    """
+    def __init__(self, base: smp.Unet):
+        super().__init__()
+        self.encoder = base.encoder
+        self.decoder = base.decoder
+        self.head    = base.segmentation_head
+        enc_chs = list(base.encoder.out_channels)
+        self.aspp  = ASPP(enc_chs[-1])
+        # one LinkConv per intermediate skip feature (skip stem[0] and deepest[-1])
+        self.links = nn.ModuleList([LinkConv(ch) for ch in enc_chs[1:-1]])
+
+    def forward(self, x):
+        feats = list(self.encoder(x))
+        feats[-1] = self.aspp(feats[-1])
+        for i, lm in enumerate(self.links):
+            feats[i + 1] = lm(feats[i + 1])
+        try:
+            dec = self.decoder(*feats)
+        except TypeError:
+            dec = self.decoder(feats)
+        return self.head(dec)
 
 
 # ── DADE bottleneck (D3FNet-style: multi-rate dilated context + differential attention) ──
@@ -203,6 +292,9 @@ def build_model(arm: Arm) -> nn.Module:
         base = smp.Unet(**kw)
         deepest = base.encoder.out_channels[-1]
         return UnetWithBottleneck(base, DADE(deepest))
+    if arm.arch == "unet_dlink":
+        base = smp.Unet(**kw)
+        return UnetDLink(base)
     return smp.Unet(**kw)
 
 

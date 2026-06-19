@@ -81,6 +81,23 @@ def postprocess_mask(mask: np.ndarray) -> np.ndarray:
     return mask
 
 
+def canopy_uncertainty_mask(img_bgr: np.ndarray, threshold: float = 0.15) -> np.ndarray:
+    """
+    Estimate pixels likely under canopy occlusion using the Excess Green Index:
+        EGI = 2·G – R – B  (normalised to [0,1])
+    High EGI ≈ dense vegetation canopy that may occlude road surface.
+    Returns a uint8 mask (255 = probable canopy) at the same resolution.
+    Use this to flag uncertain zones in the road mask for downstream scoring.
+    """
+    img_f = img_bgr.astype(np.float32) / 255.0
+    b, g, r = img_f[:, :, 0], img_f[:, :, 1], img_f[:, :, 2]
+    egi = 2.0 * g - r - b          # range roughly [-1, 2]; >0.15 ≈ vegetation
+    canopy = (egi > threshold).astype(np.uint8) * 255
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+    canopy = cv2.morphologyEx(canopy, cv2.MORPH_CLOSE, k)
+    return canopy
+
+
 def _image_paths(input_path: str) -> list[str]:
     exts = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
     if os.path.isfile(input_path):

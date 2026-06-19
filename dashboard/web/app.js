@@ -55,9 +55,11 @@
 
   // ── App state ────────────────────────────────────────────────────────────────
   const disabled = new Set();
-  let routeLayer = null;
+  let routeLayer  = null;
   let routeFadeTimer = null;
   let currentTileMode = "street";
+  let maskLayer   = null;   // Leaflet ImageOverlay for the road mask
+  let maskVisible = false;
 
   // ── Tile layers ──────────────────────────────────────────────────────────────
   const TILES = {
@@ -654,6 +656,21 @@
     // Tile mode buttons
     document.getElementById("btn-satellite").addEventListener("click", () => switchTileMode("satellite"));
     document.getElementById("btn-street").addEventListener("click",    () => switchTileMode("street"));
+
+    // Road mask overlay (only shown when export_web.py embedded a mask)
+    const maskBtn = document.getElementById("btn-mask");
+    if (D.meta.mask_image && D.meta.mask_bounds) {
+      maskLayer = L.imageOverlay(D.meta.mask_image, D.meta.mask_bounds, {
+        opacity: 0.55, interactive: false, zIndex: 500,
+      });
+      maskBtn.style.display = "";   // reveal the toggle button
+      maskBtn.addEventListener("click", () => {
+        maskVisible = !maskVisible;
+        if (maskVisible) { maskLayer.addTo(map); } else { map.removeLayer(maskLayer); }
+        maskBtn.classList.toggle("active", maskVisible);
+        maskBtn.setAttribute("aria-pressed", String(maskVisible));
+      });
+    }
 
     // Before/after compare slider
     initCompare();

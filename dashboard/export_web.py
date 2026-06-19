@@ -9,8 +9,9 @@ Usage:
 """
 
 from __future__ import annotations
-import argparse, json, os, pickle, sys
+import argparse, base64, json, os, pickle, sys
 
+import cv2
 import numpy as np
 import networkx as nx
 
@@ -39,6 +40,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--graph",       default="outputs/trackb/healed_graph.gpickle")
     ap.add_argument("--criticality", default="outputs/trackb/criticality.json")
+    ap.add_argument("--mask",        default=None,
+                    help="road_mask.png from the pipeline — embedded as a Leaflet overlay")
     ap.add_argument("--out",         default="dashboard/web/data.js")
     args = ap.parse_args()
 
@@ -80,6 +83,36 @@ def main():
             r["node_id"] = nid.get(orig, orig)
         ablation.append(r)
 
+    # ── Road mask overlay (embed as base64 RGBA PNG for Leaflet ImageOverlay) ──
+    mask_path = args.mask
+    if mask_path is None:
+        # look for mask alongside the graph file
+        mask_path = os.path.join(os.path.dirname(os.path.abspath(args.graph)), "road_mask.png")
+
+    mask_image_b64 = None
+    mask_bounds    = None
+    if os.path.exists(mask_path):
+        raw = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        if raw is not None:
+            # Downscale to 256×256 to keep data.js size manageable (~10-20 KB base64)
+            small = cv2.resize(raw, (256, 256), interpolation=cv2.INTER_NEAREST)
+            # Render roads in iOS blue (#007AFF) on a transparent background
+            rgba = np.zeros((256, 256, 4), dtype=np.uint8)
+            road_px = small > 127
+            rgba[:, :, 0][road_px] = 0
+            rgba[:, :, 1][road_px] = 122
+            rgba[:, :, 2][road_px] = 255
+            rgba[:, :, 3][road_px] = 180   # semi-transparent
+            _, buf = cv2.imencode(".png", rgba)
+            mask_image_b64 = "data:image/png;base64," + base64.b64encode(buf).decode()
+            # Derive geographic bounds from node lat/lon
+            lats = [v[0] for v in geo.values()]
+            lons = [v[1] for v in geo.values()]
+            mask_bounds = [[min(lats), min(lons)], [max(lats), max(lons)]]
+            print(f"  road mask embedded ({len(mask_image_b64)//1024} KB base64)")
+    else:
+        print(f"  road mask not found at {mask_path} — skipping overlay")
+
     lcc0 = len(max(nx.connected_components(G), key=len)) if G.number_of_nodes() else 0
     n_nodes = G.number_of_nodes()
     n_edges = G.number_of_edges()
@@ -110,6 +143,8 @@ def main():
             "lcc_baseline": lcc0,
             "city": "Bengaluru",
             "center": list(CITY_CENTER),
+            "mask_image":  mask_image_b64,   # base64 RGBA PNG or null
+            "mask_bounds": mask_bounds,       # [[lat_sw, lon_sw], [lat_ne, lon_ne]] or null
         },
         "rubric": rubric,
         "nodes": nodes,

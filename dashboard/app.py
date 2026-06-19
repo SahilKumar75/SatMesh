@@ -557,19 +557,45 @@ def main():
             use_container_width=True,
         )
         if crit and "ablation" in crit:
+            import altair as alt
             st.markdown(
                 '<div class="sm-panel-title"><span class="dot"></span>Resilience Under Attack</div>',
                 unsafe_allow_html=True,
             )
             abl = crit["ablation"]
-            st.line_chart(
-                pd.DataFrame({
-                    "Resilience Index": [r["resilience_index"] for r in abl],
-                    "Connected fraction": [r["lcc_fraction"] for r in abl],
-                }, index=[r["n_removed"] for r in abl]),
-                color=["#007AFF", "#FF9500"],
+            abl_df = pd.DataFrame({
+                "n_removed":       [r["n_removed"]       for r in abl],
+                "Resilience Index": [r["resilience_index"] for r in abl],
+                "Connected fraction": [r["lcc_fraction"]  for r in abl],
+            })
+            base = alt.Chart(abl_df).encode(
+                x=alt.X("n_removed:Q", title="Nodes removed",
+                         axis=alt.Axis(labelColor="#8E8E93", titleColor="#8E8E93")),
             )
-            st.caption("Adaptive betweenness attack — both fall as gatekeepers are removed.")
+            ri_line = base.mark_line(color="#007AFF", strokeWidth=2).encode(
+                y=alt.Y("Resilience Index:Q",
+                        scale=alt.Scale(domain=[0, 1]),
+                        title="Index (0–1)",
+                        axis=alt.Axis(labelColor="#8E8E93", titleColor="#8E8E93")),
+                tooltip=[alt.Tooltip("n_removed:Q", title="Nodes removed"),
+                         alt.Tooltip("Resilience Index:Q", format=".3f")],
+            )
+            lcc_line = base.mark_line(color="#FF9500", strokeWidth=2,
+                                       strokeDash=[4, 3]).encode(
+                y=alt.Y("Connected fraction:Q",
+                        scale=alt.Scale(domain=[0, 1]),
+                        title="Index (0–1)"),
+                tooltip=[alt.Tooltip("n_removed:Q", title="Nodes removed"),
+                         alt.Tooltip("Connected fraction:Q", format=".3f")],
+            )
+            st.altair_chart(
+                alt.layer(ri_line, lcc_line)
+                   .properties(title="Resilience Under Attack", height=180)
+                   .configure_title(color="#1C1C1E", fontSize=12, fontWeight=600)
+                   .configure_view(strokeWidth=0)
+                   .configure_axis(grid=True, gridColor="rgba(60,60,67,0.10)"),
+                use_container_width=True,
+            )
 
     if crit and "ablation" in crit:
         with st.expander("Ablation detail (per-node removal)"):
