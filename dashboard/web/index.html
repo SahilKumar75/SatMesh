@@ -26,30 +26,32 @@
   <div id="map" aria-label="Road network map — click intersections to disable them"></div>
 
   <!-- ===== Top chips bar (scrolls left panel to section) ===== -->
-  <div class="chips-bar" role="navigation" aria-label="Panel sections">
-    <button class="chip active" data-panel="sec-status">Overview</button>
-    <button class="chip"        data-panel="sec-gatekeepers">Gatekeepers</button>
-    <button class="chip"        data-panel="sec-chart">Resilience</button>
-    <button class="chip"        data-panel="sec-ablation">Stress Log</button>
-    <button class="chip"        data-panel="sec-rubric">Track B</button>
-    <button class="chip"        data-panel="sec-compare">Compare</button>
-  </div>
+  <!-- ===== Top bar: chips + map style toggle in one row ===== -->
+  <div class="top-bar">
+    <div class="chips-bar" role="navigation" aria-label="Panel sections">
+      <button class="chip active" data-panel="sec-status">Overview</button>
+      <button class="chip"        data-panel="sec-gatekeepers">Gatekeepers</button>
+      <button class="chip"        data-panel="sec-chart">Resilience</button>
+      <button class="chip"        data-panel="sec-ablation">Stress Log</button>
+      <button class="chip"        data-panel="sec-rubric">Track B</button>
+      <button class="chip"        data-panel="sec-compare">Compare</button>
+    </div>
 
-  <!-- ===== Mode toggle (top right) ===== -->
-  <div class="mode-toggle" role="group" aria-label="Map style">
-    <button class="mode-btn active" id="btn-street" aria-pressed="true">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
-      </svg>
-      Street
-    </button>
-    <button class="mode-btn" id="btn-satellite" aria-pressed="false">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
-      </svg>
-      Satellite
-    </button>
+    <div class="mode-toggle" role="group" aria-label="Map style">
+      <button class="mode-btn active" id="btn-street" aria-pressed="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Street
+      </button>
+      <button class="mode-btn" id="btn-satellite" aria-pressed="false">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
+        </svg>
+        Satellite
+      </button>
+    </div>
   </div>
 
   <!-- ===== Left floating panel ===== -->

@@ -403,12 +403,21 @@ table.ablation .node-pill.none { color: var(--muted-2); background: transparent;
 .rubric-note b { color: var(--text-dim); font-weight: 600; }
 
 /* ── Top chips bar — iOS scrolling pills ── */
-.chips-bar {
+/* ── Top bar — single row containing chips + map toggle ── */
+.top-bar {
   position: fixed;
   top: var(--panel-gap);
   left: calc(var(--panel-w) + 14px);
-  right: 180px;
+  right: var(--panel-gap);
   z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chips-bar {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -449,12 +458,13 @@ table.ablation .node-pill.none { color: var(--muted-2); background: transparent;
 
 /* ── Mode toggle — iOS segmented control ── */
 .mode-toggle {
-  position: fixed;
-  top: var(--panel-gap);
-  right: var(--panel-gap);
-  z-index: 600;
+  flex-shrink: 0;
   display: flex;
-  background: rgba(118,118,128,0.12);
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   border-radius: var(--radius-sm);
   padding: 2px;
   gap: 1px;
@@ -713,11 +723,10 @@ table.ablation .node-pill.none { color: var(--muted-2); background: transparent;
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
-  .chips-bar {
+  .top-bar {
     top: auto; bottom: calc(50vh + 8px);
     left: var(--panel-gap); right: var(--panel-gap);
   }
-  .mode-toggle { top: var(--panel-gap); right: var(--panel-gap); }
   .bottom-toolbar { display: none; }
   .map-legend { bottom: calc(50vh + 50px); right: var(--panel-gap); }
   .reroute-panel { display: none; }
