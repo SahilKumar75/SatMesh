@@ -85,28 +85,37 @@ class RoadDS(Dataset):
         self.samples = [(s, m) for s, m in self.samples if m.exists()]
 
         if subset is not None and subset < len(self.samples):
-            random.shuffle(self.samples)
+            # Deterministic shuffle so a separate val instance picks the SAME
+            # ordering — otherwise an independent random.shuffle here leaks train
+            # samples into the val split.
+            random.Random(1234).shuffle(self.samples)
             self.samples = self.samples[:subset]
 
+        # NIR path already scales the 4-ch image to [0,1] in __getitem__, so
+        # Normalize must treat it as [0,1] (max_pixel_value=1.0). The 3-ch path
+        # passes a uint8 [0,255] image, so the default 255 scaling applies.
+        norm_max = 1.0 if use_nir else 255.0
+        mean = [0.485, 0.456, 0.406, 0.4] if use_nir else [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225, 0.2] if use_nir else [0.229, 0.224, 0.225]
+
+        # ColorJitter/GaussianBlur assume 3-channel RGB; skip them on the 4-ch
+        # (RGB+NIR) tensor where they would error or corrupt the NIR band.
+        photometric = [] if use_nir else [
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=0.5),
+            A.GaussianBlur(blur_limit=(3, 7), p=0.2),
+        ]
         self.train_tf = A.Compose([
-            A.RandomResizedCrop(img_size, img_size, scale=(0.5, 1.0)),
+            A.RandomResizedCrop(size=(img_size, img_size), scale=(0.5, 1.0)),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
             A.RandomRotate90(p=0.5),
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=0.5),
-            A.GaussianBlur(blur_limit=(3, 7), p=0.2),
-            A.Normalize(
-                mean=[0.485, 0.456, 0.406, 0.4] if use_nir else [0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225, 0.2] if use_nir else [0.229, 0.224, 0.225],
-            ),
+            *photometric,
+            A.Normalize(mean=mean, std=std, max_pixel_value=norm_max),
             ToTensorV2(),
         ])
         self.val_tf = A.Compose([
             A.Resize(img_size, img_size),
-            A.Normalize(
-                mean=[0.485, 0.456, 0.406, 0.4] if use_nir else [0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225, 0.2] if use_nir else [0.229, 0.224, 0.225],
-            ),
+            A.Normalize(mean=mean, std=std, max_pixel_value=norm_max),
             ToTensorV2(),
         ])
 
@@ -189,7 +198,7 @@ def train_one_epoch(model, loader, optimizer, scaler, device):
     for imgs, masks in loader:
         imgs, masks = imgs.to(device), masks.to(device)
         optimizer.zero_grad()
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
             loss = combined_loss(logits, masks)
         scaler.scale(loss).backward()
@@ -205,7 +214,7 @@ def validate(model, loader, device):
     total_loss = total_iou = total_dice = 0.0
     for imgs, masks in loader:
         imgs, masks = imgs.to(device), masks.to(device)
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
             loss = combined_loss(logits, masks)
         pred_bin = (torch.sigmoid(logits) > 0.5)
@@ -224,15 +233,21 @@ def run_stage(config, stage):
     in_channels = 4 if cfg["use_nir"] else 3
 
     if stage == "stage2" and "checkpoint_in" in cfg and os.path.exists(cfg["checkpoint_in"]):
-        model = build_dlinknet(pretrained=False, in_channels=4)
+        model = build_dlinknet(pretrained=False, in_channels=in_channels)
         state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)
+        # conv1 channel count may differ between stages (3-ch DeepGlobe pretrain
+        # vs 4-ch RGB+NIR fine-tune). strict=False does NOT tolerate a shape
+        # mismatch on a present key, so pop conv1 and transfer it by hand:
+        # copy the shared RGB filters, init any extra NIR channel from their mean.
+        ckpt_conv1 = state.pop("base.encoder.conv1.weight", None)
         model.load_state_dict(state, strict=False)
-        if in_channels == 3:
-            old = model.base.encoder.conv1
-            new = nn.Conv2d(3, old.out_channels, old.kernel_size, old.stride, old.padding, bias=False)
+        if ckpt_conv1 is not None:
             with torch.no_grad():
-                new.weight[:] = old.weight[:, :3]
-            model.base.encoder.conv1 = new
+                tgt = model.base.encoder.conv1.weight
+                shared = min(tgt.shape[1], ckpt_conv1.shape[1])
+                tgt[:, :shared] = ckpt_conv1[:, :shared]
+                if tgt.shape[1] > ckpt_conv1.shape[1]:
+                    tgt[:, ckpt_conv1.shape[1]:] = ckpt_conv1.mean(1, keepdim=True)
     else:
         model = build_dlinknet(pretrained=True, in_channels=in_channels)
 
@@ -263,7 +278,7 @@ def run_stage(config, stage):
         epochs=cfg["epochs"],
         pct_start=0.3,
     )
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler(device.type, enabled=(device.type == "cuda"))
 
     os.makedirs(os.path.dirname(cfg["checkpoint_out"]), exist_ok=True)
     best_iou = 0.0

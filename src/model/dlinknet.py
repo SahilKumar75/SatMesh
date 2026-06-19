@@ -62,7 +62,8 @@ class DLinkNet(nn.Module):
     def forward(self, x):
         features = self.base.encoder(x)
         features[-1] = self.aspp(features[-1])
-        decoder_output = self.base.decoder(*features)
+        # smp >=0.4 UnetDecoder.forward takes the feature list as a single arg.
+        decoder_output = self.base.decoder(features)
         return self.base.segmentation_head(decoder_output)
 
 
