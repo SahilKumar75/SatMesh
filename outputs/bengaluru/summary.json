@@ -1,0 +1,106 @@
+{
+  "city_id": "bengaluru",
+  "n_nodes": 185,
+  "n_edges": 265,
+  "synthetic_edges": 0,
+  "lcc_before_heal": 181,
+  "lcc_after_heal": 181,
+  "connectivity_ratio": 0.9784,
+  "apls": 0.612,
+  "resilience_index_3": 0.8322,
+  "resilience_index_5": 0.7725,
+  "gatekeeper_count": 19,
+  "flood_critical_count": 3,
+  "ablation": [
+    {
+      "n_removed": 1,
+      "node_id": 106,
+      "betweenness": 0.23954237019422966,
+      "lcc_size": 180,
+      "lcc_fraction": 0.972972972972973,
+      "efficiency": 0.0005854650378003439,
+      "resilience_index": 0.9568263795872803
+    },
+    {
+      "n_removed": 2,
+      "node_id": 82,
+      "betweenness": 0.34036154054857626,
+      "lcc_size": 179,
+      "lcc_fraction": 0.9675675675675676,
+      "efficiency": 0.0005435352144152843,
+      "resilience_index": 0.8883004070424564
+    },
+    {
+      "n_removed": 3,
+      "node_id": 118,
+      "betweenness": 0.2411279012994717,
+      "lcc_size": 178,
+      "lcc_fraction": 0.9621621621621622,
+      "efficiency": 0.0005236771413007659,
+      "resilience_index": 0.8558463286996539
+    },
+    {
+      "n_removed": 4,
+      "node_id": 49,
+      "betweenness": 0.23913265403781273,
+      "lcc_size": 177,
+      "lcc_fraction": 0.9567567567567568,
+      "efficiency": 0.000509211901810278,
+      "resilience_index": 0.8322057663467805
+    },
+    {
+      "n_removed": 5,
+      "node_id": 142,
+      "betweenness": 0.24467343538589278,
+      "lcc_size": 176,
+      "lcc_fraction": 0.9513513513513514,
+      "efficiency": 0.0004954980956951822,
+      "resilience_index": 0.80979327267377
+    },
+    {
+      "n_removed": 6,
+      "node_id": 46,
+      "betweenness": 0.27259377644842653,
+      "lcc_size": 175,
+      "lcc_fraction": 0.9459459459459459,
+      "efficiency": 0.0004726823384929698,
+      "resilience_index": 0.7725054468398728
+    },
+    {
+      "n_removed": 7,
+      "node_id": 159,
+      "betweenness": 0.2909468905692879,
+      "lcc_size": 172,
+      "lcc_fraction": 0.9297297297297298,
+      "efficiency": 0.0004404224191310092,
+      "resilience_index": 0.7197830127815494
+    },
+    {
+      "n_removed": 8,
+      "node_id": 14,
+      "betweenness": 0.45658705701078584,
+      "lcc_size": 102,
+      "lcc_fraction": 0.5513513513513514,
+      "efficiency": 0.00024293603652450545,
+      "resilience_index": 0.3970307247933316
+    },
+    {
+      "n_removed": 9,
+      "node_id": 80,
+      "betweenness": 0.09890537367863479,
+      "lcc_size": 101,
+      "lcc_fraction": 0.5459459459459459,
+      "efficiency": 0.00022437406857701294,
+      "resilience_index": 0.36669487304726867
+    },
+    {
+      "n_removed": 10,
+      "node_id": 89,
+      "betweenness": 0.12951047851929023,
+      "lcc_size": 100,
+      "lcc_fraction": 0.5405405405405406,
+      "efficiency": 0.0002108274056329298,
+      "resilience_index": 0.34455554170653624
+    }
+  ]
+}
