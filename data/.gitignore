@@ -1,0 +1,11 @@
+# Ignore downloaded datasets and cache — track only scripts
+*
+!.gitignore
+!*.py
+!*.md
+cache/
+ms_roads_*.geojson
+osm_*.graphml
+osm_*.geojson
+osm_*.gpickle
+osm_meta.json
