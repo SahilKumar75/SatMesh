@@ -82,6 +82,45 @@ print(f"train: {len(train_pairs)}  val: {len(val_pairs)}  test: {len(test_pairs)
 IMG   = 512
 BATCH = 4 if DEVICE == "cuda" else 2
 
+
+class CanopyOcclusionOnRoad:
+    """Paint green-tinted ellipses *along road pixels* to simulate tree canopy.
+
+    Applied before albumentations so it operates on raw uint8 RGB + uint8 mask.
+    Only modifies the image; the mask (ground truth) is left intact so the model
+    must learn to predict roads even when they are visually occluded.
+    """
+    def __init__(self, num_blobs=(4, 20), blob_r=(10, 50), p=0.5):
+        self.num_blobs = num_blobs
+        self.blob_r    = blob_r
+        self.p         = p
+
+    def __call__(self, image: np.ndarray, mask_u8: np.ndarray) -> np.ndarray:
+        if random.random() > self.p:
+            return image
+        ys, xs = np.where(mask_u8 > 127)
+        if len(ys) == 0:
+            return image
+        out = image.copy()
+        n   = random.randint(*self.num_blobs)
+        idx = np.random.choice(len(ys), size=min(n, len(ys)), replace=True)
+        for i in idx:
+            cx, cy = int(xs[i]), int(ys[i])
+            rx = random.randint(*self.blob_r)
+            ry = random.randint(*self.blob_r)
+            # earthy-green canopy colour with natural variation
+            color = (
+                random.randint(20, 65),
+                random.randint(75, 155),
+                random.randint(15, 60),
+            )
+            cv2.ellipse(out, (cx, cy), (rx, ry),
+                        random.uniform(0, 180), 0, 360, color, -1)
+        return out
+
+
+_canopy_aug = CanopyOcclusionOnRoad(p=0.5)
+
 train_tf = A.Compose([
     A.Resize(IMG, IMG),
     A.HorizontalFlip(p=0.5),
@@ -103,27 +142,29 @@ val_tf = A.Compose([A.Resize(IMG, IMG), A.Normalize(), ToTensorV2()])
 
 
 class RoadDS(Dataset):
-    def __init__(self, items, tf):
-        self.items, self.tf = items, tf
+    def __init__(self, items, tf, canopy_aug=None):
+        self.items, self.tf, self.canopy_aug = items, tf, canopy_aug
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, i):
         sp, mp = self.items[i]
-        img = cv2.cvtColor(cv2.imread(sp), cv2.COLOR_BGR2RGB)
-        msk = cv2.imread(mp, cv2.IMREAD_GRAYSCALE)
-        msk = (msk > 127).astype("float32")
+        img     = cv2.cvtColor(cv2.imread(sp), cv2.COLOR_BGR2RGB)
+        msk_u8  = cv2.imread(mp, cv2.IMREAD_GRAYSCALE)
+        if self.canopy_aug is not None:
+            img = self.canopy_aug(img, msk_u8)
+        msk = (msk_u8 > 127).astype("float32")
         a = self.tf(image=img, mask=msk)
         return a["image"], a["mask"].unsqueeze(0)
 
 
 # pin_memory only works on CUDA — disabled for MPS and CPU
 pin = (DEVICE == "cuda")
-train_dl = DataLoader(RoadDS(train_pairs, train_tf), batch_size=BATCH,
-                      shuffle=True,  num_workers=2, pin_memory=pin)
-val_dl   = DataLoader(RoadDS(val_pairs,   val_tf),   batch_size=BATCH,
-                      shuffle=False, num_workers=2, pin_memory=pin)
+train_dl = DataLoader(RoadDS(train_pairs, train_tf, canopy_aug=_canopy_aug),
+                      batch_size=BATCH, shuffle=True,  num_workers=2, pin_memory=pin)
+val_dl   = DataLoader(RoadDS(val_pairs,   val_tf),
+                      batch_size=BATCH, shuffle=False, num_workers=2, pin_memory=pin)
 
 # ── 3. CP_clDice loss ────────────────────────────────────────────────────────
 # Soft skeleton via iterative morphological min/max pooling (differentiable).

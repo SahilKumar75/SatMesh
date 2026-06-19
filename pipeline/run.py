@@ -2,11 +2,19 @@
 pipeline/run.py — end-to-end SatMesh runner.
 
 Usage:
+    # Manual lat/lon:
     python pipeline/run.py \\
         --image     img.jpg \\
         --checkpoint best_model.pth \\
         --pixel_m   0.5 \\
         --top_left_lat 12.98 --top_left_lon 77.58 \\
+        --output_dir outputs/
+
+    # Auto-georef from Bhoonidhi GeoTIFF (overrides --top_left_lat/lon):
+    python pipeline/run.py \\
+        --image     img.jpg \\
+        --checkpoint best_model.pth \\
+        --bhoonidhi_tif bengaluru_tile.tif \\
         --output_dir outputs/
 
 Produces:
@@ -22,6 +30,29 @@ Produces:
 
 from __future__ import annotations
 import argparse, json, os, sys, time
+
+
+def _lat_lon_from_tif(tif_path: str) -> tuple[float, float]:
+    """Extract top-left (lat, lon) from a georeferenced GeoTIFF via rasterio."""
+    try:
+        import rasterio
+        from rasterio.crs import CRS
+        from pyproj import Transformer
+    except ImportError:
+        raise SystemExit(
+            "rasterio and pyproj are required for --bhoonidhi_tif. "
+            "Run: pip install rasterio pyproj"
+        )
+    with rasterio.open(tif_path) as ds:
+        tf = ds.transform
+        # top-left pixel centre in the dataset CRS
+        x_tl, y_tl = tf.c, tf.f
+        src_crs = ds.crs or CRS.from_epsg(4326)
+    if src_crs.to_epsg() == 4326:
+        return float(y_tl), float(x_tl)
+    to_wgs84 = Transformer.from_crs(src_crs, CRS.from_epsg(4326), always_xy=True)
+    lon, lat = to_wgs84.transform(x_tl, y_tl)
+    return float(lat), float(lon)
 
 # allow running from repo root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -196,6 +227,10 @@ def main():
     p.add_argument("--max_gap_m",      type=float, default=50.0)
     p.add_argument("--top_left_lat",   type=float, default=0.0)
     p.add_argument("--top_left_lon",   type=float, default=0.0)
+    p.add_argument("--bhoonidhi_tif",  default=None,
+                   help="Georeferenced GeoTIFF from bhoonidhi.nrsc.gov.in — "
+                        "top-left lat/lon extracted automatically via rasterio "
+                        "(overrides --top_left_lat/lon)")
     p.add_argument("--img_size",       type=int,   default=512)
     p.add_argument("--threshold",      type=float, default=0.5)
     p.add_argument("--max_removals",   type=int,   default=10)
@@ -205,14 +240,19 @@ def main():
                    help="Pre-downloaded OSM .graphml for Track B baseline")
     args = p.parse_args()
 
+    top_left_lat, top_left_lon = args.top_left_lat, args.top_left_lon
+    if args.bhoonidhi_tif:
+        top_left_lat, top_left_lon = _lat_lon_from_tif(args.bhoonidhi_tif)
+        print(f"[georef] extracted from TIF → lat={top_left_lat:.6f}, lon={top_left_lon:.6f}")
+
     run_pipeline(
         input_image=args.image,
         checkpoint=args.checkpoint,
         output_dir=args.output_dir,
         pixel_m=args.pixel_m,
         max_gap_m=args.max_gap_m,
-        top_left_lat=args.top_left_lat,
-        top_left_lon=args.top_left_lon,
+        top_left_lat=top_left_lat,
+        top_left_lon=top_left_lon,
         img_size=args.img_size,
         threshold=args.threshold,
         max_removals=args.max_removals,
