@@ -11,25 +11,30 @@
   if (!D) {
     document.body.innerHTML = [
       '<div style="display:flex;align-items:center;justify-content:center;height:100vh;',
-      'background:#0a0f1a;color:#e2e8f0;font-family:Inter,system-ui,sans-serif;',
+      'background:#F2F2F7;color:#1C1C1E;font-family:-apple-system,BlinkMacSystemFont,sans-serif;',
       'text-align:center;flex-direction:column;gap:16px;">',
-      '<svg width="48" height="48" fill="none" stroke="#f43f5e" stroke-width="1.5" viewBox="0 0 24 24">',
+      '<svg width="52" height="52" fill="none" stroke="#FF3B30" stroke-width="1.5" viewBox="0 0 24 24">',
       '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/>',
       '<line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
-      '<h2 style="font-size:1.4rem;margin:0;font-weight:700">Data not loaded</h2>',
-      '<p style="color:#7e8da6;max-width:360px;margin:0;line-height:1.6">',
-      'Run <code style="background:#111a2b;padding:2px 6px;border-radius:4px;font-family:monospace">',
+      '<h2 style="font-size:1.4rem;margin:0;font-weight:700;letter-spacing:-.3px">Data not loaded</h2>',
+      '<p style="color:rgba(60,60,67,.6);max-width:360px;margin:0;line-height:1.6">',
+      'Run <code style="background:#fff;border:1px solid rgba(60,60,67,.18);padding:2px 8px;border-radius:6px;font-family:ui-monospace,monospace">',
       'python dashboard/export_web.py</code> to generate data.js, then reload.</p>',
       '</div>',
     ].join("");
     return;
   }
 
-  // ── Palette ──────────────────────────────────────────────────────────────────
+  // ── Palette — iOS system colors ──────────────────────────────────────────────
   const C = {
-    green: "#22c55e", amber: "#f59e0b", red: "#f43f5e",
-    slate: "#475569", accent: "#38bdf8",
-    disabledFill: "#1a0508", disabledRing: "#f43f5e",
+    green:        "#34C759",  // iOS green
+    amber:        "#FF9500",  // iOS orange
+    red:          "#FF3B30",  // iOS red
+    slate:        "#8E8E93",  // iOS grey
+    accent:       "#007AFF",  // iOS blue
+    teal:         "#5AC8FA",  // iOS teal
+    disabledFill: "#FFE5E3",  // pale red fill
+    disabledRing: "#FF3B30",  // bright red outline
   };
 
   // ── Derived structures ───────────────────────────────────────────────────────
@@ -52,20 +57,21 @@
   const disabled = new Set();
   let routeLayer = null;
   let routeFadeTimer = null;
-  let currentTileMode = "satellite";
+  let currentTileMode = "street";
 
   // ── Tile layers ──────────────────────────────────────────────────────────────
   const TILES = {
+    street: {
+      // CartoDB Voyager — clean Google Maps-like light basemap
+      url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a> &copy; <a href="https://carto.com/" target="_blank" rel="noopener">CartoDB</a>',
+      maxZoom: 19,
+      subdomains: "abcd",
+    },
     satellite: {
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       attribution: "Tiles &copy; Esri — Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP",
       maxZoom: 19,
-    },
-    street: {
-      url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      subdomains: "abc",
     },
   };
 
@@ -78,11 +84,13 @@
     zoomAnimation: true,
   });
 
-  // Start on satellite
-  let tileLayer = L.tileLayer(TILES.satellite.url, {
-    maxZoom: TILES.satellite.maxZoom,
-    attribution: TILES.satellite.attribution,
+  // Start on street (light CartoDB Voyager)
+  let tileLayer = L.tileLayer(TILES.street.url, {
+    maxZoom: TILES.street.maxZoom,
+    subdomains: TILES.street.subdomains || "",
+    attribution: TILES.street.attribution,
   }).addTo(map);
+  document.body.classList.add("street-mode");
 
   map.attributionControl.setPrefix("");
 
@@ -108,10 +116,10 @@
     tileLayer.bringToBack();
     currentTileMode = mode;
     document.body.classList.toggle("street-mode", mode === "street");
-    document.getElementById("btn-satellite").classList.toggle("active", mode === "satellite");
-    document.getElementById("btn-satellite").setAttribute("aria-pressed", String(mode === "satellite"));
     document.getElementById("btn-street").classList.toggle("active", mode === "street");
     document.getElementById("btn-street").setAttribute("aria-pressed", String(mode === "street"));
+    document.getElementById("btn-satellite").classList.toggle("active", mode === "satellite");
+    document.getElementById("btn-satellite").setAttribute("aria-pressed", String(mode === "satellite"));
   }
 
   // ── Colour helpers ────────────────────────────────────────────────────────────
@@ -163,7 +171,7 @@
       if (!a || !b) return;
       L.polyline([[a.lat, a.lon], [b.lat, b.lon]], opts).addTo(edgeLayer);
     };
-    normal.forEach(e => line(e, { color: C.slate, weight: 1, opacity: 0.45 }));
+    normal.forEach(e => line(e, { color: C.accent, weight: 1.2, opacity: 0.3 }));
     healed.forEach(e => line(e, { color: C.green, weight: 2, opacity: 0.8 }));
   }
 
@@ -211,8 +219,8 @@
       };
     }
     return {
-      radius: radiusFor(n), color: "rgba(255,255,255,.5)", weight: 0.8,
-      fillColor: bcColor(n.bc), fillOpacity: 0.9, opacity: 1, dashArray: null,
+      radius: radiusFor(n), color: bcColor(n.bc), weight: 2,
+      fillColor: "#FFFFFF", fillOpacity: 1, opacity: 1, dashArray: null,
     };
   }
 
@@ -460,8 +468,8 @@
   function buildChart() {
     const ctx = document.getElementById("ablation-chart");
     if (!ctx || !window.Chart) return;
-    Chart.defaults.font.family = "Inter, sans-serif";
-    Chart.defaults.color = "#7e8da6";
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif";
+    Chart.defaults.color = "rgba(60,60,67,0.6)";
     new Chart(ctx, {
       type: "line",
       data: {
@@ -470,7 +478,7 @@
           {
             label: "Resilience index",
             data: D.ablation.map(a => a.resilience_index),
-            borderColor: C.accent, backgroundColor: "rgba(56,189,248,.1)",
+            borderColor: C.accent, backgroundColor: "rgba(0,122,255,.08)",
             fill: true, tension: 0.32, borderWidth: 2,
             pointRadius: 2, pointBackgroundColor: C.accent,
           },
@@ -489,8 +497,8 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: "#16223a", borderColor: "#1e2d47", borderWidth: 1,
-            titleColor: "#e2e8f0", bodyColor: "#b4c0d4",
+            backgroundColor: "rgba(255,255,255,0.95)", borderColor: "rgba(60,60,67,0.18)", borderWidth: 1,
+            titleColor: "#1C1C1E", bodyColor: "rgba(60,60,67,0.6)",
             callbacks: {
               title: t => `${t[0].label} gatekeepers removed`,
               label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(3)}`,
@@ -499,15 +507,15 @@
         },
         scales: {
           x: {
-            grid: { color: "rgba(30,45,71,.5)" },
+            grid: { color: "rgba(60,60,67,0.1)" },
             ticks: { maxRotation: 0, font: { size: 10 } },
-            title: { display: true, text: "Nodes removed", color: "#5b6b85", font: { size: 10 } },
+            title: { display: true, text: "Nodes removed", color: "rgba(60,60,67,0.6)", font: { size: 10 } },
           },
           y: {
             min: 0, max: 1,
-            grid: { color: "rgba(30,45,71,.5)" },
+            grid: { color: "rgba(60,60,67,0.1)" },
             ticks: { stepSize: 0.25, font: { size: 10 } },
-            title: { display: true, text: "Index (0–1)", color: "#5b6b85", font: { size: 10 } },
+            title: { display: true, text: "Index (0–1)", color: "rgba(60,60,67,0.6)", font: { size: 10 } },
           },
         },
       },

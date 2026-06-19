@@ -6,16 +6,14 @@
   <title>SatMesh — Bengaluru Route Resilience</title>
 
   <meta name="description" content="SatMesh: occlusion-robust road extraction and graph-theoretic resilience simulator for urban road networks. ISRO BAH 2026 PS4." />
-  <meta name="theme-color" content="#0a0f1a" />
+  <meta name="theme-color" content="#F2F2F7" />
   <meta property="og:title" content="SatMesh — Bengaluru Route Resilience" />
   <meta property="og:description" content="Occlusion-robust road extraction + graph-theoretic resilience simulator. ISRO BAH 2026, PS4." />
   <meta property="og:type" content="website" />
 
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='30' cy='30' r='14' fill='%2338bdf8'/><circle cx='70' cy='25' r='14' fill='%2338bdf8'/><circle cx='50' cy='70' r='14' fill='%2338bdf8'/><line x1='30' y1='30' x2='70' y2='25' stroke='%2338bdf8' stroke-width='8'/><line x1='30' y1='30' x2='50' y2='70' stroke='%2338bdf8' stroke-width='8'/><line x1='70' y1='25' x2='50' y2='70' stroke='%2338bdf8' stroke-width='8'/></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='30' cy='30' r='14' fill='%23007AFF'/><circle cx='70' cy='25' r='14' fill='%23007AFF'/><circle cx='50' cy='70' r='14' fill='%23007AFF'/><line x1='30' y1='30' x2='70' y2='25' stroke='%23007AFF' stroke-width='8'/><line x1='30' y1='30' x2='50' y2='70' stroke='%23007AFF' stroke-width='8'/><line x1='70' y1='25' x2='50' y2='70' stroke='%23007AFF' stroke-width='8'/></svg>" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- SF Pro / system font loaded natively — no external font request needed -->
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -38,18 +36,18 @@
 
   <!-- ===== Mode toggle (top right) ===== -->
   <div class="mode-toggle" role="group" aria-label="Map style">
-    <button class="mode-btn active" id="btn-satellite" aria-pressed="true">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
-      </svg>
-      Satellite
-    </button>
-    <button class="mode-btn" id="btn-street" aria-pressed="false">
+    <button class="mode-btn active" id="btn-street" aria-pressed="true">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
         <polyline points="9 22 9 12 15 12 15 22"/>
       </svg>
       Street
+    </button>
+    <button class="mode-btn" id="btn-satellite" aria-pressed="false">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
+      </svg>
+      Satellite
     </button>
   </div>
 
@@ -124,8 +122,8 @@
                   role="img"></canvas>
         </div>
         <div class="chart-legend" aria-hidden="true">
-          <span><i class="swatch" style="background:#38bdf8"></i> Resilience index</span>
-          <span><i class="swatch" style="background:#f59e0b"></i> Connected fraction</span>
+          <span><i class="swatch" style="background:#007AFF"></i> Resilience index</span>
+          <span><i class="swatch" style="background:#FF9500"></i> Connected fraction</span>
         </div>
       </section>
 
@@ -194,9 +192,9 @@
   <div class="map-legend" aria-label="Map legend">
     <ul class="legend-list" role="list">
       <li class="item">Betweenness <i class="ramp" aria-label="colour scale low to high"></i></li>
-      <li class="item"><i class="dotmk" style="background:#1a0508;box-shadow:0 0 0 2px #f43f5e inset" aria-hidden="true"></i> Disabled</li>
-      <li class="item"><i class="linemk" style="background:#22c55e" aria-hidden="true"></i> Healed</li>
-      <li class="item"><i class="linemk" style="background:#f59e0b" aria-hidden="true"></i> Route</li>
+      <li class="item"><i class="dotmk" style="background:#FFE5E3;box-shadow:0 0 0 2px #FF3B30 inset" aria-hidden="true"></i> Disabled</li>
+      <li class="item"><i class="linemk" style="background:#34C759" aria-hidden="true"></i> Healed</li>
+      <li class="item"><i class="linemk" style="background:#FF9500" aria-hidden="true"></i> Route</li>
     </ul>
   </div>
 

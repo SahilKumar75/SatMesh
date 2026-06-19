@@ -170,25 +170,30 @@ def _inject_css():
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+        /* SF Pro loads natively — no external font request */
 
         :root {
-            --sm-bg:        #0a0f1a;
-            --sm-surface:   #111a2b;
-            --sm-surface-2: #16223a;
-            --sm-border:    #1e2d47;
-            --sm-text:      #e2e8f0;
-            --sm-muted:     #7e8da6;
-            --sm-accent:    #38bdf8;
-            --sm-good:      #22c55e;
-            --sm-bad:       #f43f5e;
-            --sm-warn:      #f59e0b;
+            --sm-bg:        #F2F2F7;
+            --sm-surface:   #FFFFFF;
+            --sm-surface-2: rgba(242,242,247,0.9);
+            --sm-border:    rgba(60,60,67,0.18);
+            --sm-separator: rgba(60,60,67,0.12);
+            --sm-text:      #1C1C1E;
+            --sm-muted:     rgba(60,60,67,0.6);
+            --sm-accent:    #007AFF;
+            --sm-good:      #34C759;
+            --sm-bad:       #FF3B30;
+            --sm-warn:      #FF9500;
+            --sm-shadow:    0 2px 8px rgba(0,0,0,.08);
+            --sm-shadow-md: 0 8px 24px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.06);
+            --sm-radius:    14px;
+            --sm-font:      -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
         }
 
         html, body, [class*="css"], .stApp, .stMarkdown, p, span, label, div {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: var(--sm-font) !important;
         }
-        .stApp { background: var(--sm-bg); }
+        .stApp { background: var(--sm-bg) !important; }
 
         /* hide default Streamlit chrome for a cleaner product look */
         #MainMenu, header[data-testid="stHeader"], footer { visibility: hidden; }
@@ -198,47 +203,47 @@ def _inject_css():
         .sm-header {
             display: flex; align-items: center; gap: 16px;
             padding: 18px 22px; margin-bottom: 18px;
-            background: linear-gradient(135deg, #101a2e 0%, #0c1322 100%);
+            background: var(--sm-surface);
             border: 1px solid var(--sm-border);
-            border-radius: 12px;
-            box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 8px 24px rgba(0,0,0,.35);
+            border-radius: var(--sm-radius);
+            box-shadow: var(--sm-shadow-md);
         }
         .sm-mark {
             width: 46px; height: 46px; flex: 0 0 46px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, var(--sm-accent) 0%, #0ea5e9 60%, #2563eb 100%);
+            border-radius: 12px;
+            background: var(--sm-accent);
             display: flex; align-items: center; justify-content: center;
         }
         .sm-wordmark {
-            font-size: 1.5rem; font-weight: 800; letter-spacing: .5px;
+            font-size: 1.4rem; font-weight: 700; letter-spacing: -.3px;
             color: var(--sm-text); line-height: 1.1;
         }
         .sm-wordmark .sm-accent { color: var(--sm-accent); }
         .sm-sub {
             font-size: .80rem; color: var(--sm-muted); margin-top: 2px;
-            letter-spacing: .2px; font-weight: 500;
+            letter-spacing: .1px; font-weight: 400;
         }
         .sm-badge {
             margin-left: auto; align-self: flex-start;
             font-size: .68rem; font-weight: 600; letter-spacing: .8px;
             text-transform: uppercase;
             color: var(--sm-accent);
-            border: 1px solid var(--sm-border);
-            background: rgba(56,189,248,.08);
-            padding: 5px 10px; border-radius: 6px;
+            border: 1px solid rgba(0,122,255,0.3);
+            background: rgba(0,122,255,.08);
+            padding: 5px 10px; border-radius: 999px;
         }
 
         /* ── Metric cards ───────────────────────────────────────── */
         .sm-card {
             background: var(--sm-surface);
-            border: 1px solid var(--sm-border);
-            border-radius: 11px;
+            border: none;
+            border-radius: var(--sm-radius);
             padding: 14px 16px;
             height: 100%;
-            box-shadow: 0 4px 14px rgba(0,0,0,.25);
+            box-shadow: var(--sm-shadow);
         }
         .sm-card .sm-label {
-            font-size: .70rem; font-weight: 600; letter-spacing: .9px;
+            font-size: .70rem; font-weight: 600; letter-spacing: .6px;
             text-transform: uppercase; color: var(--sm-muted);
         }
         .sm-card .sm-value {
@@ -257,16 +262,17 @@ def _inject_css():
         /* ── Section panels ─────────────────────────────────────── */
         .sm-panel {
             background: var(--sm-surface);
-            border: 1px solid var(--sm-border);
-            border-radius: 11px;
+            border: none;
+            border-radius: var(--sm-radius);
             padding: 4px 14px 10px 14px;
             margin-bottom: 14px;
+            box-shadow: var(--sm-shadow);
         }
         .sm-panel-title {
-            font-size: .80rem; font-weight: 700; letter-spacing: .6px;
+            font-size: .80rem; font-weight: 600; letter-spacing: .4px;
             text-transform: uppercase; color: var(--sm-text);
             padding: 12px 2px 8px 2px;
-            border-bottom: 1px solid var(--sm-border);
+            border-bottom: 1px solid var(--sm-separator);
             margin-bottom: 8px;
         }
         .sm-panel-title .dot {
@@ -275,24 +281,43 @@ def _inject_css():
         }
 
         /* map container framing */
-        iframe { border-radius: 11px; border: 1px solid var(--sm-border); }
+        iframe { border-radius: var(--sm-radius); border: 1px solid var(--sm-border); }
 
         /* dataframes */
-        [data-testid="stDataFrame"] { border-radius: 9px; }
+        [data-testid="stDataFrame"] { border-radius: 10px; }
 
         /* sidebar */
         section[data-testid="stSidebar"] {
-            background: #0c1322;
+            background: rgba(255,255,255,0.85) !important;
             border-right: 1px solid var(--sm-border);
+            backdrop-filter: blur(20px);
         }
         .sm-side-head {
-            font-size: .72rem; font-weight: 700; letter-spacing: 1px;
+            font-size: .72rem; font-weight: 600; letter-spacing: .8px;
             text-transform: uppercase; color: var(--sm-accent);
             margin: 4px 0 2px 0;
         }
         section[data-testid="stSidebar"] .stButton button {
-            border-radius: 8px; font-weight: 600;
-            border: 1px solid var(--sm-border);
+            border-radius: 10px; font-weight: 600;
+            background: var(--sm-accent) !important;
+            color: #fff !important;
+            border: none !important;
+            box-shadow: var(--sm-shadow);
+        }
+
+        /* progress bars */
+        .stProgress > div > div > div > div {
+            background: var(--sm-accent) !important;
+            border-radius: 999px !important;
+        }
+        .stProgress > div > div > div {
+            background: rgba(60,60,67,0.1) !important;
+            border-radius: 999px !important;
+        }
+
+        /* sliders */
+        [data-testid="stSlider"] [role="slider"] {
+            background: var(--sm-accent) !important;
         }
 
         .sm-legend { font-size:.78rem; color: var(--sm-muted); margin: 4px 0 8px 0; }
@@ -314,6 +339,7 @@ _SM_GLYPH = (
     '<path d="M6 6 L18 7 M6 6 L12 17 M18 7 L12 17" stroke="white" '
     'stroke-width="1.6" stroke-linecap="round"/></svg>'
 )
+# Note: glyph is white-on-blue (rendered inside .sm-mark which has --sm-accent bg)
 
 
 def _metric_card(col, label, value, delta=None, good=None):
