@@ -541,6 +541,53 @@
     });
   }
 
+  // ── PS4 Track B rubric strip ──────────────────────────────────────────────────
+  function buildRubric() {
+    const grid = document.getElementById("rubric-grid");
+    const note = document.getElementById("rubric-note");
+    if (!grid) return;
+
+    const R = D.rubric;
+    if (!R) {
+      grid.innerHTML = '<p style="color:var(--muted);font-size:11px;grid-column:1/-1;margin:0;">Regenerate data.js to populate.</p>';
+      return;
+    }
+
+    function card(val, label, badge, accentBorder) {
+      const c = document.createElement("div");
+      c.className = "rubric-card" + (accentBorder ? " accent-border" : "");
+      c.innerHTML =
+        `<span class="rv tnum">${val}</span>` +
+        `<span class="rk">${label}</span>` +
+        (badge ? `<span class="rbadge">${badge}</span>` : "");
+      return c;
+    }
+
+    grid.innerHTML = "";
+
+    const cr  = ((R.connectivity_ratio ?? 0) * 100).toFixed(1) + "%";
+    const ri0 = (R.resilience_index_0 ?? 1).toFixed(3);
+    const ri3 = R.resilience_index_3 != null ? R.resilience_index_3.toFixed(3) : "—";
+    const ri5 = R.resilience_index_5 != null ? R.resilience_index_5.toFixed(3) : "—";
+    const gk  = (R.gatekeeper_count ?? "—").toString();
+    const synPct = (R.synthetic_edge_pct ?? 0).toFixed(1) + "%";
+
+    grid.appendChild(card(cr,      "Connectivity ratio",      "Track B · LCC/N",  true));
+    grid.appendChild(card(ri0,     "Resilience index (base)", "1.000 = perfect",  false));
+    grid.appendChild(card(ri3,     "RI after 3 removals",     "Adaptive attack",  false));
+    grid.appendChild(card(ri5,     "RI after 5 removals",     "Worst-case stress",false));
+    grid.appendChild(card(gk,      "Gatekeeper nodes",        "High betweenness", true));
+    grid.appendChild(card(synPct,  "Healed-bridge coverage",  "Synthetic edges",  false));
+
+    if (note) {
+      const lcc = R.lcc_baseline ?? D.meta.lcc_baseline;
+      const n   = R.n_nodes ?? D.meta.n_nodes;
+      const eff = R.global_efficiency_0 != null ? R.global_efficiency_0.toFixed(5) : "—";
+      note.innerHTML =
+        `LCC baseline <b>${lcc}</b> / <b>${n}</b> nodes &nbsp;·&nbsp; Global efficiency <b>${eff}</b>`;
+    }
+  }
+
   // ── Chips navigation (scroll panel to section) ────────────────────────────────
   function wireChips() {
     document.querySelectorAll(".chip[data-panel]").forEach(chip => {
@@ -568,6 +615,7 @@
     buildSelects();
     buildChart();
     buildTable();
+    buildRubric();
     refresh();
     wireChips();
 

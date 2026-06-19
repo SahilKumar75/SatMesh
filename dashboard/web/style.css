@@ -269,6 +269,43 @@ table.ablation .node-pill.none { color: var(--muted-2); background: transparent;
 }
 .foot-note b { color: var(--muted); font-weight: 600; }
 
+/* ── PS4 Track B rubric metrics ── */
+.rubric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.rubric-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rubric-card.accent-border { border-color: rgba(56,189,248,.3); }
+.rubric-card .rv {
+  font-family: var(--mono); font-size: 17px; font-weight: 600;
+  letter-spacing: -.3px; color: var(--text);
+}
+.rubric-card .rk {
+  font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px;
+}
+.rubric-card .rbadge {
+  font-size: 9px; font-weight: 600;
+  padding: 1px 5px; border-radius: 4px; margin-top: 3px; width: fit-content;
+  background: rgba(56,189,248,.1); color: var(--accent);
+  border: 1px solid rgba(56,189,248,.2);
+}
+.rubric-note {
+  font-size: 10px; color: var(--muted-2); margin-top: 2px;
+  padding: 6px 2px;
+  border-top: 1px solid var(--border-soft);
+}
+.rubric-note b { color: var(--muted); font-weight: 600; }
+
 /* ── Top chips bar ── */
 .chips-bar {
   position: fixed;

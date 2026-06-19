@@ -33,6 +33,7 @@
     <button class="chip"        data-panel="sec-gatekeepers">Gatekeepers</button>
     <button class="chip"        data-panel="sec-chart">Resilience</button>
     <button class="chip"        data-panel="sec-ablation">Stress Log</button>
+    <button class="chip"        data-panel="sec-rubric">Track B</button>
   </div>
 
   <!-- ===== Mode toggle (top right) ===== -->
@@ -154,6 +155,15 @@
             LCC baseline <b id="foot-lcc">—</b> · <span id="foot-meta">Loading…</span>
           </div>
         </details>
+      </section>
+
+      <div class="sec-divider"></div>
+
+      <!-- PS4 Track B rubric metrics -->
+      <section class="panel-sec" id="sec-rubric">
+        <div class="sec-label">PS4 Track B Metrics <span class="tag-pill">RUBRIC</span></div>
+        <div class="rubric-grid" id="rubric-grid"><!-- populated by JS --></div>
+        <div class="rubric-note" id="rubric-note"></div>
       </section>
 
       <!-- Bottom spacer so last section isn't hidden behind toolbar -->

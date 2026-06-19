@@ -81,15 +81,37 @@ def main():
         ablation.append(r)
 
     lcc0 = len(max(nx.connected_components(G), key=len)) if G.number_of_nodes() else 0
+    n_nodes = G.number_of_nodes()
+    n_edges = G.number_of_edges()
+    n_syn   = sum(1 for _, _, d in G.edges(data=True) if d.get("synthetic"))
+
+    # Track B rubric metrics derived from graph + ablation
+    ri_after = {a["n_removed"]: a.get("resilience_index", 1.0) for a in ablation}
+    eff0 = next((a.get("efficiency") for a in ablation if a["n_removed"] == 0), None)
+    rubric = {
+        "connectivity_ratio":   round(lcc0 / max(n_nodes, 1), 4),
+        "resilience_index_0":   round(ri_after.get(0, 1.0), 4),
+        "resilience_index_3":   round(ri_after[3], 4) if 3 in ri_after else None,
+        "resilience_index_5":   round(ri_after[5], 4) if 5 in ri_after else None,
+        "global_efficiency_0":  round(float(eff0), 6) if eff0 is not None else None,
+        "gatekeeper_count":     len(gatekeepers),
+        "synthetic_edges":      n_syn,
+        "synthetic_edge_pct":   round(n_syn / max(n_edges, 1) * 100, 1),
+        "lcc_baseline":         lcc0,
+        "n_nodes":              n_nodes,
+        "n_edges":              n_edges,
+    }
+
     payload = {
         "meta": {
-            "n_nodes": G.number_of_nodes(),
-            "n_edges": G.number_of_edges(),
-            "synthetic_edges": sum(1 for _, _, d in G.edges(data=True) if d.get("synthetic")),
+            "n_nodes": n_nodes,
+            "n_edges": n_edges,
+            "synthetic_edges": n_syn,
             "lcc_baseline": lcc0,
             "city": "Bengaluru",
             "center": list(CITY_CENTER),
         },
+        "rubric": rubric,
         "nodes": nodes,
         "edges": edges,
         "gatekeepers": gatekeepers,

@@ -402,21 +402,24 @@ def main():
         dst = st.selectbox("To", node_opts, index=min(len(node_opts) - 1, 20))
         if st.button("Compute reroute", use_container_width=True,
                      help="Find shortest path between these nodes under current failures"):
-            from track_b.criticality import compute_reroute
-            try:
-                s, d = ntype(src), ntype(dst)
-                with st.spinner("Routing…"):
-                    base_path, base_len = compute_reroute(G, [], s, d)
-                    new_path,  new_len  = compute_reroute(G, ss["disabled"], s, d)
-                ss["reroute_path"] = new_path
-                if new_len == float("inf"):
-                    ss["reroute_info"] = ("cut", base_len, None)
-                else:
-                    inc = (new_len - base_len) / base_len * 100 if base_len > 0 else 0
-                    ss["reroute_info"] = ("ok", base_len, (new_len, inc))
-            except Exception as exc:
-                st.error(f"Reroute failed: {exc}")
-            st.rerun()
+            if src == dst:
+                st.error("Source and destination must be different nodes.")
+            else:
+                from track_b.criticality import compute_reroute
+                try:
+                    s, d = ntype(src), ntype(dst)
+                    with st.spinner("Routing…"):
+                        base_path, base_len = compute_reroute(G, [], s, d)
+                        new_path,  new_len  = compute_reroute(G, ss["disabled"], s, d)
+                    ss["reroute_path"] = new_path
+                    if new_len == float("inf"):
+                        ss["reroute_info"] = ("cut", base_len, None)
+                    else:
+                        inc = (new_len - base_len) / base_len * 100 if base_len > 0 else 0
+                        ss["reroute_info"] = ("ok", base_len, (new_len, inc))
+                except Exception as exc:
+                    st.error(f"Reroute failed: {exc}")
+                st.rerun()
 
     disabled = [ntype(n) for n in ss["disabled"]]
     G_active = G.copy()
@@ -516,8 +519,29 @@ def main():
 
     if crit and "ablation" in crit:
         with st.expander("Ablation detail (per-node removal)"):
-            st.dataframe(pd.DataFrame(crit["ablation"]).set_index("n_removed"),
-                         use_container_width=True)
+            abl_df = pd.DataFrame(crit["ablation"]).set_index("n_removed")
+            st.dataframe(abl_df, use_container_width=True)
+
+        st.divider()
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            st.download_button(
+                "⬇ Download ablation CSV",
+                data=pd.DataFrame(crit["ablation"]).to_csv(index=False),
+                file_name="satmesh_ablation.csv",
+                mime="text/csv",
+                use_container_width=True,
+                help="Per-step resilience metrics (Resilience Index, LCC fraction, efficiency)",
+            )
+        with dl2:
+            st.download_button(
+                "⬇ Download criticality JSON",
+                data=json.dumps(crit, indent=2),
+                file_name="satmesh_criticality.json",
+                mime="application/json",
+                use_container_width=True,
+                help="Full betweenness centrality + ablation data as JSON",
+            )
 
 
 if __name__ == "__main__":
