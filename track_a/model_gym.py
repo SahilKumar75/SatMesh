@@ -57,7 +57,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else (
 def _soft_erode(x):  return -F.max_pool2d(-x, 3, 1, 1)
 def _soft_dilate(x): return  F.max_pool2d( x, 3, 1, 1)
 
-def soft_skel(x, iters=3):
+def soft_skel(x, iters=3):  # iters=3 here; road_segmentation.py uses iters=5 (looser, faster inference)
     skel = F.relu(x - _soft_dilate(_soft_erode(x)))
     for _ in range(iters - 1):
         x = _soft_erode(x)

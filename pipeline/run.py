@@ -63,6 +63,12 @@ def run_pipeline(
 
     device = _device()
     print(f"  device: {device}")
+    if not os.path.exists(checkpoint):
+        raise FileNotFoundError(
+            f"Checkpoint not found: {checkpoint}\n"
+            "  Train the model first (track_a/road_segmentation.py) or point --checkpoint "
+            "to an existing best_model.pth file."
+        )
     model = load_model(checkpoint, device, in_channels=3)
 
     mask = predict_mask(model, input_image, device, img_size=img_size,
@@ -80,12 +86,13 @@ def run_pipeline(
     from track_b.heal import run_heal_pipeline
 
     graph_path = os.path.join(output_dir, "healed_graph.gpickle")
-    G_healed = run_heal_pipeline(
+    G_healed, G_skeleton = run_heal_pipeline(
         mask_path, graph_path,
         pixel_m=pixel_m,
         top_left_lat=top_left_lat,
         top_left_lon=top_left_lon,
         max_gap_m=max_gap_m,
+        return_skeleton=True,
     )
     summary["outputs"]["healed_graph"] = graph_path
 
@@ -124,14 +131,16 @@ def run_pipeline(
             summary["outputs"]["osm_graphml"] = osm_save
             print(f"  OSM graph saved → {osm_save}")
         except Exception as e:
-            print(f"  OSM download failed ({e}), using healed graph as proxy")
-            G_osm = G_healed
+            print(f"  OSM download failed ({e}), topological_accuracy will be skipped")
+            G_osm = None
     else:
-        print("  no OSM reference — using healed graph as proxy")
-        G_osm = G_healed
+        print("  no OSM reference — topological_accuracy skipped "
+              "(pass --top_left_lat/lon to enable OSM download)")
+        G_osm = None
 
     tb_path = os.path.join(output_dir, "track_b_metrics.json")
-    tb_metrics = evaluate_track_b(G_healed, G_healed, G_osm, output_json=tb_path)
+    # G_skeleton (pre-heal) vs G_healed: gives the true connectivity_ratio
+    tb_metrics = evaluate_track_b(G_skeleton, G_healed, G_osm, output_json=tb_path)
     summary["outputs"]["track_b_metrics"] = tb_path
     summary["metrics"].update(tb_metrics)
 

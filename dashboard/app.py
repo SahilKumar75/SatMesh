@@ -46,14 +46,22 @@ def _parse_args():
 
 @st.cache_resource
 def load_graph(path: str) -> nx.Graph:
-    with open(path, "rb") as f:
-        return pickle.load(f)
+    try:
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    except Exception as exc:
+        st.error(f"Failed to load graph `{path}`: {exc}")
+        st.stop()
 
 
 @st.cache_resource
 def load_criticality(path: str) -> dict:
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception as exc:
+        st.warning(f"Could not load criticality JSON `{path}`: {exc}")
+        return {}
 
 
 @st.cache_data
@@ -140,7 +148,7 @@ def build_map(G, geo, bc, disabled, reroute_path):
     for n in sorted(bc, key=bc.get, reverse=True)[:500]:
         lat, lon = geo[n]
         off = n in disabled
-        fill = "#0a0f1a" if off else _bc_colour(bc.get(n, 0), bc_max)
+        fill = "#1a0508" if off else _bc_colour(bc.get(n, 0), bc_max)
         ring = "#f43f5e" if off else fill
         folium.CircleMarker(
             location=(lat, lon),
@@ -300,10 +308,10 @@ def _inject_css():
 _SM_GLYPH = (
     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" '
     'xmlns="http://www.w3.org/2000/svg">'
-    '<circle cx="6" cy="6" r="2.2" fill="#0a0f1a"/>'
-    '<circle cx="18" cy="7" r="2.2" fill="#0a0f1a"/>'
-    '<circle cx="12" cy="17" r="2.2" fill="#0a0f1a"/>'
-    '<path d="M6 6 L18 7 M6 6 L12 17 M18 7 L12 17" stroke="#0a0f1a" '
+    '<circle cx="6" cy="6" r="2.2" fill="white"/>'
+    '<circle cx="18" cy="7" r="2.2" fill="white"/>'
+    '<circle cx="12" cy="17" r="2.2" fill="white"/>'
+    '<path d="M6 6 L18 7 M6 6 L12 17 M18 7 L12 17" stroke="white" '
     'stroke-width="1.6" stroke-linecap="round"/></svg>'
 )
 
@@ -322,9 +330,14 @@ def _metric_card(col, label, value, delta=None, good=None):
 def main():
     st.set_page_config(
         page_title="SatMesh — Route Resilience",
-        page_icon="◆",
+        page_icon="🛰️",
         layout="wide",
         initial_sidebar_state="expanded",
+        menu_items={
+            "Get Help": None,
+            "Report a bug": None,
+            "About": "SatMesh · ISRO BAH 2026 PS4 · Occlusion-Robust Road Resilience",
+        },
     )
     _inject_css()
     st.markdown(
@@ -350,7 +363,8 @@ def main():
         return
 
     G = load_graph(graph_path)
-    bc = compute_bc(G)
+    with st.spinner("Computing betweenness centrality…"):
+        bc = compute_bc(G)
     geo = geo_project(G)
     ranked = sorted(bc, key=bc.get, reverse=True)
     ntype = type(ranked[0]) if ranked else int
@@ -370,11 +384,14 @@ def main():
     with st.sidebar:
         st.divider()
         st.markdown('<div class="sm-side-head">Failure Simulation</div>', unsafe_allow_html=True)
-        if st.button("▲  Disable top 3 gatekeepers", use_container_width=True, type="primary"):
+        if st.button("▲  Disable top 3 gatekeepers", use_container_width=True,
+                     type="primary",
+                     help="Remove the 3 highest-betweenness intersections to simulate a catastrophic failure"):
             ss["disabled"] = [ranked[i] for i in range(min(3, len(ranked)))]
             ss["reroute_path"] = []; ss["reroute_info"] = None
             st.rerun()
-        if st.button("Clear all", use_container_width=True):
+        if st.button("Clear all", use_container_width=True,
+                     help="Restore all disabled intersections"):
             ss["disabled"] = []; ss["reroute_path"] = []; ss["reroute_info"] = None
             st.rerun()
 
@@ -383,17 +400,22 @@ def main():
         node_opts = [str(n) for n in G.nodes]
         src = st.selectbox("From", node_opts, index=0)
         dst = st.selectbox("To", node_opts, index=min(len(node_opts) - 1, 20))
-        if st.button("Compute reroute", use_container_width=True):
+        if st.button("Compute reroute", use_container_width=True,
+                     help="Find shortest path between these nodes under current failures"):
             from track_b.criticality import compute_reroute
-            s, d = ntype(src), ntype(dst)
-            base_path, base_len = compute_reroute(G, [], s, d)
-            new_path,  new_len  = compute_reroute(G, ss["disabled"], s, d)
-            ss["reroute_path"] = new_path
-            if new_len == float("inf"):
-                ss["reroute_info"] = ("cut", base_len, None)
-            else:
-                inc = (new_len - base_len) / base_len * 100 if base_len > 0 else 0
-                ss["reroute_info"] = ("ok", base_len, (new_len, inc))
+            try:
+                s, d = ntype(src), ntype(dst)
+                with st.spinner("Routing…"):
+                    base_path, base_len = compute_reroute(G, [], s, d)
+                    new_path,  new_len  = compute_reroute(G, ss["disabled"], s, d)
+                ss["reroute_path"] = new_path
+                if new_len == float("inf"):
+                    ss["reroute_info"] = ("cut", base_len, None)
+                else:
+                    inc = (new_len - base_len) / base_len * 100 if base_len > 0 else 0
+                    ss["reroute_info"] = ("ok", base_len, (new_len, inc))
+            except Exception as exc:
+                st.error(f"Reroute failed: {exc}")
             st.rerun()
 
     disabled = [ntype(n) for n in ss["disabled"]]
@@ -432,6 +454,15 @@ def main():
             st.warning(f"Detour required: travel distance **{base_len:.0f} m → {new_len:.0f} m**, "
                        f"a **+{inc:.0f}%** increase in travel time.")
 
+    # ── Onboarding hint ───────────────────────────────────────────────────────
+    if not disabled:
+        st.info(
+            "**Try it:** click any intersection on the map to disable it, "
+            "then use *Compute reroute* to see the detour — or hit "
+            "*Disable top 3 gatekeepers* for a one-click stress test.",
+            icon="ℹ️",
+        )
+
     # ── Map + side panels ─────────────────────────────────────────────────────
     st.write("")
     map_col, side = st.columns([3, 1], gap="medium")
@@ -447,7 +478,8 @@ def main():
             '</div>',
             unsafe_allow_html=True,
         )
-        fmap = build_map(G, geo, bc, disabled, ss["reroute_path"])
+        with st.spinner("Rendering map…"):
+            fmap = build_map(G, geo, bc, disabled, ss["reroute_path"])
         md = st_folium(fmap, width=None, height=560, key="map")
         clk = (md or {}).get("last_object_clicked")
         if clk and clk.get("lat") is not None:

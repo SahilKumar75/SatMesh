@@ -255,14 +255,22 @@ def add_geo_coords(
 # ── Pipeline runner ───────────────────────────────────────────────────────────
 
 def run_heal_pipeline(
-    mask_path:     str,
-    output_path:   str,
-    pixel_m:       float = 0.5,
-    top_left_lat:  float = 0.0,
-    top_left_lon:  float = 0.0,
-    max_gap_m:     float = 50.0,
-    angular_thr:   float = 0.7,
-) -> nx.Graph:
+    mask_path:      str,
+    output_path:    str,
+    pixel_m:        float = 0.5,
+    top_left_lat:   float = 0.0,
+    top_left_lon:   float = 0.0,
+    max_gap_m:      float = 50.0,
+    angular_thr:    float = 0.7,
+    return_skeleton: bool = False,
+) -> "nx.Graph | tuple[nx.Graph, nx.Graph]":
+    """
+    Run the skeleton→heal pipeline.
+
+    When return_skeleton=True returns (G_healed, G_skeleton) so callers can
+    compute connectivity_ratio correctly (healed vs pre-heal skeleton).
+    Default False keeps the old single-return signature for backwards compat.
+    """
     print(f"[heal] skeletonising {mask_path} ...")
     skel  = skeletonize_mask(mask_path)
     nodes = extract_nodes(skel)
@@ -271,24 +279,27 @@ def run_heal_pipeline(
     edges = trace_edges(skel, nodes)
     print(f"[heal] {len(edges)} edges traced")
 
-    G = build_skeleton_graph(nodes, edges, pixel_m)
-    print(f"[heal] graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+    G_skeleton = build_skeleton_graph(nodes, edges, pixel_m)
+    print(f"[heal] graph: {G_skeleton.number_of_nodes()} nodes, {G_skeleton.number_of_edges()} edges")
 
-    lcc_before = max((len(c) for c in nx.connected_components(G)), default=0)
-    G = heal_gaps(G, max_gap_m=max_gap_m, angular_threshold=angular_thr)
-    lcc_after  = max((len(c) for c in nx.connected_components(G)), default=0)
-    new_edges   = sum(1 for _, _, d in G.edges(data=True) if d.get("synthetic"))
+    lcc_before = max((len(c) for c in nx.connected_components(G_skeleton)), default=0)
+    G_healed = heal_gaps(G_skeleton.copy(), max_gap_m=max_gap_m, angular_threshold=angular_thr)
+    lcc_after  = max((len(c) for c in nx.connected_components(G_healed)), default=0)
+    new_edges   = sum(1 for _, _, d in G_healed.edges(data=True) if d.get("synthetic"))
     print(f"[heal] {new_edges} synthetic edges added  "
           f"| LCC {lcc_before} → {lcc_after} nodes")
 
     if top_left_lat != 0.0 or top_left_lon != 0.0:
-        G = add_geo_coords(G, top_left_lat, top_left_lon)
+        G_healed = add_geo_coords(G_healed, top_left_lat, top_left_lon)
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     with open(output_path, "wb") as f:
-        pickle.dump(G, f, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(G_healed, f, protocol=pickle.HIGHEST_PROTOCOL)
     print(f"[heal] saved → {output_path}")
-    return G
+
+    if return_skeleton:
+        return G_healed, G_skeleton
+    return G_healed
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
