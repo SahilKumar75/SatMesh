@@ -55,6 +55,15 @@ CITIES = {
     "chennai":   {"bbox": [12.90, 80.15, 13.15, 80.35], "name": "Chennai"},
 }
 
+# Generalisation eval: diverse terrain types not in training set.
+# OSM coverage here is 20-40% — lower mask quality, lower expected IoU (~0.40-0.55).
+# Run with: python scripts/gather_all_data.py --cities coorg jaisalmer shillong
+EVAL_CITIES = {
+    "coorg":      {"bbox": [11.95, 75.80, 12.50, 76.15], "name": "Coorg (forested, W.Ghats)"},
+    "jaisalmer":  {"bbox": [26.85, 70.85, 27.00, 71.00], "name": "Jaisalmer (desert)"},
+    "shillong":   {"bbox": [25.52, 91.85, 25.62, 91.95], "name": "Shillong (NE hilly)"},
+}
+
 
 # ─────────────────────────────────────────────
 # 1. DeepGlobe

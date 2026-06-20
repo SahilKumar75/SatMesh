@@ -11,6 +11,8 @@ import rasterio
 from pathlib import Path
 
 CITIES = ["bengaluru", "delhi", "mumbai", "hyderabad", "chennai"]
+# Eval-only cities for terrain generalisation — no train tiles generated
+EVAL_CITIES = ["coorg", "jaisalmer", "shillong"]
 TILE = 512
 SENTINEL_ROOT = Path("data/raw/sentinel")
 TRAIN_DIR = Path("data/sentinel2_india/train")
@@ -27,7 +29,7 @@ def _percentile_stretch(arr, lo=2, hi=98):
     return np.clip((arr - p_lo) / (p_hi - p_lo + 1e-6) * 255, 0, 255).astype(np.uint8)
 
 
-def export_city(city_id: str) -> None:
+def export_city(city_id: str, eval_only: bool = False) -> None:
     cdir = SENTINEL_ROOT / city_id
 
     # Load full bands into memory
@@ -63,7 +65,7 @@ def export_city(city_id: str) -> None:
 
     n_train = n_eval = 0
     for i, (row, col, r, g, b, nir, m) in enumerate(tiles):
-        is_eval = (i % 5 == 0)
+        is_eval = eval_only or (i % 5 == 0)
         out_dir = (EVAL_DIR_BASE / city_id) if is_eval else TRAIN_DIR
         out_dir.mkdir(parents=True, exist_ok=True)
         stem = f"{city_id}_{row:04d}_{col:04d}"
@@ -97,6 +99,13 @@ def main():
             export_city(city)
         else:
             print(f"  {city}: no sentinel data, skipping")
+    print("Generalisation eval cities (eval-only):")
+    for city in EVAL_CITIES:
+        red_tif = SENTINEL_ROOT / city / "red.tif"
+        if red_tif.exists():
+            export_city(city, eval_only=True)
+        else:
+            print(f"  {city}: no sentinel data, skipping (run gather_all_data.py first)")
     print("Done.")
     print(f"  Train dir: {TRAIN_DIR}")
     print(f"  Eval dirs: {EVAL_DIR_BASE}/<city>/")
