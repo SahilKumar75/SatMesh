@@ -8,7 +8,6 @@ Usage:
 import numpy as np
 import cv2
 import rasterio
-from rasterio.windows import Window
 from pathlib import Path
 
 CITIES = ["bengaluru", "delhi", "mumbai", "hyderabad", "chennai"]
@@ -30,28 +29,38 @@ def _percentile_stretch(arr, lo=2, hi=98):
 
 def export_city(city_id: str) -> None:
     cdir = SENTINEL_ROOT / city_id
-    band_srcs = {b: rasterio.open(str(cdir / f"{b}.tif")) for b in ["red", "green", "blue", "nir"]}
-    mask_src = rasterio.open(str(cdir / "osm_road_mask.tif"))
-    H = min(band_srcs["red"].height, mask_src.height)
-    W = min(band_srcs["red"].width,  mask_src.width)
+
+    # Load full bands into memory
+    def _read(name):
+        with rasterio.open(str(cdir / f"{name}.tif")) as s:
+            return s.read(1).astype(np.float32)
+
+    r_full   = _read("red")
+    H, W     = r_full.shape
+    g_full   = _read("green")
+    b_full   = _read("blue")
+    nir_full = _read("nir")
+
+    with rasterio.open(str(cdir / "osm_road_mask.tif")) as s:
+        m_full = s.read(1)
+
+    # Resize mask to band dims — OSM mask may differ due to prior CRS bug
+    if m_full.shape != (H, W):
+        m_full = cv2.resize(m_full, (W, H), interpolation=cv2.INTER_NEAREST)
 
     tiles = []
     for row in range(0, H - TILE + 1, TILE):
         for col in range(0, W - TILE + 1, TILE):
-            win = Window(col, row, TILE, TILE)
-            r   = band_srcs["red"].read(1, window=win).astype(np.float32)
-            g   = band_srcs["green"].read(1, window=win).astype(np.float32)
-            b   = band_srcs["blue"].read(1, window=win).astype(np.float32)
-            nir = band_srcs["nir"].read(1, window=win).astype(np.float32)
-            m   = mask_src.read(1, window=win)
-            if m.shape != (TILE, TILE) or r.shape != (TILE, TILE):
-                continue
+            m = m_full[row:row+TILE, col:col+TILE]
             if m.mean() < ROAD_MASK_THRESHOLD:
                 continue
-            tiles.append((row, col, r, g, b, nir, m))
+            tiles.append((row, col,
+                           r_full[row:row+TILE, col:col+TILE],
+                           g_full[row:row+TILE, col:col+TILE],
+                           b_full[row:row+TILE, col:col+TILE],
+                           nir_full[row:row+TILE, col:col+TILE],
+                           m))
 
-    # 1-in-5 skip: every 5th tile → eval; rest → train.
-    # Reduces spatial bias vs. row-ordered top/bottom split.
     n_train = n_eval = 0
     for i, (row, col, r, g, b, nir, m) in enumerate(tiles):
         is_eval = (i % 5 == 0)
@@ -62,9 +71,6 @@ def export_city(city_id: str) -> None:
         rgb = np.stack([_percentile_stretch(r), _percentile_stretch(g), _percentile_stretch(b)], axis=-1)
         cv2.imwrite(str(out_dir / f"{stem}_sat.jpg"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
 
-        # Write NIR as raw float32 (do NOT divide by 10000 here).
-        # train.py:146-147 guards: `if nir.max() > 1.0: nir /= 10000.0`
-        # Writing raw values lets train.py apply that guard exactly once.
         with rasterio.open(
             str(out_dir / f"{stem}_nir.tif"), "w",
             driver="GTiff", height=TILE, width=TILE, count=1, dtype="float32",
@@ -78,9 +84,6 @@ def export_city(city_id: str) -> None:
         else:
             n_train += 1
 
-    for s in band_srcs.values():
-        s.close()
-    mask_src.close()
     print(f"  {city_id}: {len(tiles)} road tiles → {n_train} train, {n_eval} eval")
 
 
