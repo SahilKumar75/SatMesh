@@ -277,11 +277,10 @@ def run_stage(config, stage):
                             num_workers=4, pin_memory=True)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=cfg["lr"],
-        steps_per_epoch=len(train_loader),
-        epochs=cfg["epochs"],
-        pct_start=0.3,
+    # CosineAnnealingLR: step per epoch, decays LR smoothly to eta_min
+    # Replaces OneCycleLR which was incorrectly stepped once/epoch instead of once/batch
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=cfg["epochs"], eta_min=cfg["lr"] * 0.01,
     )
     scaler = torch.amp.GradScaler(device.type, enabled=(device.type == "cuda"))
 

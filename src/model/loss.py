@@ -31,8 +31,10 @@ def cl_dice_loss(pred_logits, target, iters=5, smooth=1.0):
 
 
 _dice = smp.losses.DiceLoss(mode="binary")
-_bce = nn.BCEWithLogitsLoss()
 
 
 def combined_loss(logits, target, w_dice=0.35, w_bce=0.30, w_cldice=0.35):
-    return w_dice * _dice(logits, target) + w_bce * _bce(logits, target) + w_cldice * cl_dice_loss(logits, target)
+    # pos_weight=5: roads ~15% of pixels, upweight to fix class imbalance
+    pw = torch.tensor([5.0], device=logits.device)
+    bce = F.binary_cross_entropy_with_logits(logits, target, pos_weight=pw)
+    return w_dice * _dice(logits, target) + w_bce * bce + w_cldice * cl_dice_loss(logits, target)
