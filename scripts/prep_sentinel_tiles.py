@@ -32,8 +32,8 @@ def export_city(city_id: str) -> None:
     cdir = SENTINEL_ROOT / city_id
     band_srcs = {b: rasterio.open(str(cdir / f"{b}.tif")) for b in ["red", "green", "blue", "nir"]}
     mask_src = rasterio.open(str(cdir / "osm_road_mask.tif"))
-    H = band_srcs["red"].height
-    W = band_srcs["red"].width
+    H = min(band_srcs["red"].height, mask_src.height)
+    W = min(band_srcs["red"].width,  mask_src.width)
 
     tiles = []
     for row in range(0, H - TILE + 1, TILE):
@@ -44,6 +44,8 @@ def export_city(city_id: str) -> None:
             b   = band_srcs["blue"].read(1, window=win).astype(np.float32)
             nir = band_srcs["nir"].read(1, window=win).astype(np.float32)
             m   = mask_src.read(1, window=win)
+            if m.shape != (TILE, TILE) or r.shape != (TILE, TILE):
+                continue
             if m.mean() < ROAD_MASK_THRESHOLD:
                 continue
             tiles.append((row, col, r, g, b, nir, m))
