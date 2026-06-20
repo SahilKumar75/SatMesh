@@ -44,7 +44,7 @@ def main():
     ap.add_argument("--deepglobe", default=None, help="DeepGlobe train dir (else auto-download)")
     ap.add_argument("--india-dir", default=None, help="Sentinel-2 India tile dir for stage 2")
     ap.add_argument("--epochs", type=int, default=30)
-    ap.add_argument("--epochs2", type=int, default=20)
+    ap.add_argument("--epochs2", type=int, default=30)
     ap.add_argument("--batch", type=int, default=16, help="stage-1 batch (L4 handles 16 @512)")
     ap.add_argument("--batch2", type=int, default=8)
     ap.add_argument("--img-size", type=int, default=512)
@@ -64,7 +64,7 @@ def main():
                    "use_nir": False, "model": args.model,
                    "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
-                   "epochs": args.epochs2, "batch": args.batch2, "lr": 2e-4,
+                   "epochs": args.epochs2, "batch": args.batch2, "lr": 5e-5,
                    "img_size": args.img_size, "subset": None, "use_nir": True,
                    "model": args.model,
                    "checkpoint_in": f"{args.out}/stage1.pth",

@@ -276,7 +276,19 @@ def run_stage(config, stage):
     val_loader = DataLoader(val_subset, batch_size=cfg["batch"], shuffle=False,
                             num_workers=4, pin_memory=True)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=1e-4)
+    if stage == "stage2":
+        # Stage-2: encoder already pretrained — keep it slow to avoid catastrophic
+        # forgetting while the NIR patch_embed and decoder adapt.
+        encoder_params = [p for n, p in model.named_parameters()
+                          if "encoder" in n and "patch_embed1" not in n]
+        other_params = [p for n, p in model.named_parameters()
+                        if not ("encoder" in n and "patch_embed1" not in n)]
+        optimizer = torch.optim.AdamW([
+            {"params": encoder_params, "lr": cfg["lr"] * 0.1},
+            {"params": other_params,   "lr": cfg["lr"]},
+        ], weight_decay=1e-4)
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=1e-4)
     # CosineAnnealingLR: step per epoch, decays LR smoothly to eta_min
     # Replaces OneCycleLR which was incorrectly stepped once/epoch instead of once/batch
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
