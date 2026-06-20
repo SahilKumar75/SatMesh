@@ -12,10 +12,11 @@ def run_pipeline(
     checkpoint: str,
     cities_path: str = "cities.json",
     force_rerun: bool = False,
+    model_type: str = "segformer",
 ) -> Generator[dict, None, None]:
     import torch
     from src.data.city_config import load_city
-    from src.model.infer import load_dlinknet, predict_mask
+    from src.model.infer import load_model, predict_mask
     from src.graph.skeleton import skeletonize_mask, extract_nodes, trace_edges, build_skeleton_graph
     from src.graph.heal import heal_gaps, add_geo_coords
     from src.graph.dem import fetch_srtm_dem, attach_elevation, mark_flood_nodes
@@ -42,7 +43,7 @@ def run_pipeline(
         yield ev
 
     yield from emit("loading_model", 0)
-    model = load_dlinknet(checkpoint, device, in_channels=4)
+    model = load_model(checkpoint, device, model_type=model_type, in_channels=4)
 
     yield from emit("segmenting", 10)
     sat_path = str(out_dir / "satellite.jpg")

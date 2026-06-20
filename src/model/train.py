@@ -13,6 +13,7 @@ from albumentations.pytorch import ToTensorV2
 import yaml
 
 from .dlinknet import build_dlinknet
+from .segformer import build_segformer, build_segformer_4ch
 from .loss import combined_loss
 
 
@@ -232,24 +233,28 @@ def run_stage(config, stage):
 
     in_channels = 4 if cfg["use_nir"] else 3
 
+    model_type = cfg.get("model", "dlinknet")
+
     if stage == "stage2" and "checkpoint_in" in cfg and os.path.exists(cfg["checkpoint_in"]):
-        model = build_dlinknet(pretrained=False, in_channels=in_channels)
-        state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)
-        # conv1 channel count may differ between stages (3-ch DeepGlobe pretrain
-        # vs 4-ch RGB+NIR fine-tune). strict=False does NOT tolerate a shape
-        # mismatch on a present key, so pop conv1 and transfer it by hand:
-        # copy the shared RGB filters, init any extra NIR channel from their mean.
-        ckpt_conv1 = state.pop("base.encoder.conv1.weight", None)
-        model.load_state_dict(state, strict=False)
-        if ckpt_conv1 is not None:
-            with torch.no_grad():
-                tgt = model.base.encoder.conv1.weight
-                shared = min(tgt.shape[1], ckpt_conv1.shape[1])
-                tgt[:, :shared] = ckpt_conv1[:, :shared]
-                if tgt.shape[1] > ckpt_conv1.shape[1]:
-                    tgt[:, ckpt_conv1.shape[1]:] = ckpt_conv1.mean(1, keepdim=True)
+        if model_type == "segformer":
+            model = build_segformer_4ch(cfg["checkpoint_in"], device=str(device))
+        else:
+            model = build_dlinknet(pretrained=False, in_channels=in_channels)
+            state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)
+            ckpt_conv1 = state.pop("base.encoder.conv1.weight", None)
+            model.load_state_dict(state, strict=False)
+            if ckpt_conv1 is not None:
+                with torch.no_grad():
+                    tgt = model.base.encoder.conv1.weight
+                    shared = min(tgt.shape[1], ckpt_conv1.shape[1])
+                    tgt[:, :shared] = ckpt_conv1[:, :shared]
+                    if tgt.shape[1] > ckpt_conv1.shape[1]:
+                        tgt[:, ckpt_conv1.shape[1]:] = ckpt_conv1.mean(1, keepdim=True)
     else:
-        model = build_dlinknet(pretrained=True, in_channels=in_channels)
+        if model_type == "segformer":
+            model = build_segformer(pretrained=True, in_channels=in_channels)
+        else:
+            model = build_dlinknet(pretrained=True, in_channels=in_channels)
 
     model = model.to(device)
 

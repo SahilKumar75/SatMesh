@@ -68,3 +68,46 @@ def predict_mask(model, image_path, device, nir_path=None, img_size=512, thresho
     if (h, w) != (img_size, img_size):
         mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
     return postprocess_mask(mask)
+
+
+def load_model(checkpoint_path, device, model_type="segformer", in_channels=4):
+    if model_type == "segformer":
+        from .segformer import build_segformer
+        model = build_segformer(pretrained=False, in_channels=in_channels).to(device)
+    else:
+        model = build_dlinknet(pretrained=False, in_channels=in_channels).to(device)
+    state = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    model.load_state_dict(state)
+    model.eval()
+    return model
+
+
+if __name__ == "__main__":
+    import argparse
+    import glob
+    import os
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--checkpoint", required=True)
+    ap.add_argument("--model", default="segformer", choices=["segformer", "dlinknet"])
+    ap.add_argument("--sat_dir", required=True)
+    ap.add_argument("--out_dir", required=True)
+    ap.add_argument("--img_size", type=int, default=512)
+    args = ap.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = load_model(args.checkpoint, device, args.model)
+
+    sat_files = sorted(glob.glob(f"{args.sat_dir}/*_sat.jpg"))
+    if not sat_files:
+        sat_files = sorted(glob.glob(f"{args.sat_dir}/*_sat.png"))
+
+    for f in sat_files:
+        stem = os.path.basename(f).replace("_sat.jpg", "").replace("_sat.png", "")
+        nir_path = f.replace("_sat.jpg", "_nir.tif").replace("_sat.png", "_nir.tif")
+        nir_path = nir_path if os.path.exists(nir_path) else None
+        mask = predict_mask(model, f, device, nir_path=nir_path, img_size=args.img_size)
+        cv2.imwrite(f"{args.out_dir}/{stem}_pred.png", mask)
+
+    print(f"Saved {len(sat_files)} predictions → {args.out_dir}")

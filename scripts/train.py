@@ -51,6 +51,7 @@ def main():
     ap.add_argument("--subset", type=int, default=5000)
     ap.add_argument("--out", default="checkpoints")
     ap.add_argument("--skip-stage1", action="store_true")
+    ap.add_argument("--model", default="segformer", choices=["segformer", "dlinknet"])
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -60,12 +61,14 @@ def main():
     cfg = {
         "stage1": {"data_dir": dg, "epochs": args.epochs, "batch": args.batch,
                    "lr": 1e-3, "img_size": args.img_size, "subset": args.subset,
-                   "use_nir": False, "checkpoint_out": f"{args.out}/stage1.pth"},
+                   "use_nir": False, "model": args.model,
+                   "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
                    "epochs": args.epochs2, "batch": args.batch2, "lr": 2e-4,
                    "img_size": args.img_size, "subset": None, "use_nir": True,
+                   "model": args.model,
                    "checkpoint_in": f"{args.out}/stage1.pth",
-                   "checkpoint_out": f"{args.out}/dlinknet_india.pth"},
+                   "checkpoint_out": f"{args.out}/{args.model}_india.pth"},
     }
 
     if not args.skip_stage1:
@@ -76,7 +79,7 @@ def main():
     else:
         import shutil
         shutil.copy(cfg["stage1"]["checkpoint_out"], cfg["stage2"]["checkpoint_out"])
-        print("No India data — stage1 (3-ch) saved as dlinknet_india.pth. "
+        print(f"No India data — stage1 (3-ch) saved as {args.model}_india.pth. "
               "Re-run with --india-dir for the 4-ch domain-adapted model.")
 
     print("Done. Checkpoint:", cfg["stage2"]["checkpoint_out"])
