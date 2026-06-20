@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -24,8 +25,10 @@ DEFAULT_CONFIG = {
         "batch": 8,
         "lr": 1e-3,
         "img_size": 512,
-        "subset": 5000,
+        "subset": None,
         "use_nir": False,
+        "encoder_name": "mit_b0",
+        "grad_checkpoint": False,
         "checkpoint_out": "checkpoints/stage1.pth",
     },
     "stage2": {
@@ -36,6 +39,8 @@ DEFAULT_CONFIG = {
         "img_size": 512,
         "subset": None,
         "use_nir": True,
+        "encoder_name": "mit_b0",
+        "grad_checkpoint": False,
         "checkpoint_in": "checkpoints/stage1.pth",
         "checkpoint_out": "checkpoints/dlinknet_india.pth",
     },
@@ -193,15 +198,25 @@ def _dice_coef(pred_bin, target):
     return (2 * inter + 1e-6) / (pred_bin.float().sum() + target.float().sum() + 1e-6)
 
 
-def train_one_epoch(model, loader, optimizer, scaler, device):
+def _relaxed_iou(pred_bin, target, r=3):
+    k, pad = 2 * r + 1, r
+    t_dil = F.max_pool2d(target.float(), k, stride=1, padding=pad) > 0
+    p_dil = F.max_pool2d(pred_bin.float(), k, stride=1, padding=pad) > 0
+    inter = (p_dil & target).float().sum()
+    union = (p_dil | t_dil).float().sum()
+    return (inter + 1e-6) / (union + 1e-6)
+
+
+def train_one_epoch(model, loader, optimizer, scaler, device, epoch=0):
     model.train()
+    use_skelrecall = (epoch >= 10)
     total_loss = 0.0
     for imgs, masks in loader:
         imgs, masks = imgs.to(device), masks.to(device)
         optimizer.zero_grad()
         with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
-            loss = combined_loss(logits, masks)
+            loss = combined_loss(logits, masks, use_skelrecall=use_skelrecall)
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -212,19 +227,20 @@ def train_one_epoch(model, loader, optimizer, scaler, device):
 @torch.no_grad()
 def validate(model, loader, device):
     model.eval()
-    total_loss = total_iou = total_dice = 0.0
+    total_loss = total_iou = total_dice = total_relaxed = 0.0
     for imgs, masks in loader:
         imgs, masks = imgs.to(device), masks.to(device)
         with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
-            loss = combined_loss(logits, masks)
+            loss = combined_loss(logits, masks, use_skelrecall=False)
         pred_bin = (torch.sigmoid(logits) > 0.5)
         target_bin = (masks > 0.5)
         total_loss += loss.item()
         total_iou += _iou(pred_bin, target_bin).item()
         total_dice += _dice_coef(pred_bin, target_bin).item()
+        total_relaxed += _relaxed_iou(pred_bin, target_bin).item()
     n = len(loader)
-    return total_loss / n, total_iou / n, total_dice / n
+    return total_loss / n, total_iou / n, total_dice / n, total_relaxed / n
 
 
 def run_stage(config, stage):
@@ -232,12 +248,13 @@ def run_stage(config, stage):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     in_channels = 4 if cfg["use_nir"] else 3
-
     model_type = cfg.get("model", "dlinknet")
+    encoder_name = cfg.get("encoder_name", "mit_b0")
 
     if stage == "stage2" and "checkpoint_in" in cfg and os.path.exists(cfg["checkpoint_in"]):
         if model_type == "segformer":
-            model = build_segformer_4ch(cfg["checkpoint_in"], device=str(device))
+            model = build_segformer_4ch(cfg["checkpoint_in"], device=str(device),
+                                        encoder_name=encoder_name)
         else:
             model = build_dlinknet(pretrained=False, in_channels=in_channels)
             state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)
@@ -252,11 +269,19 @@ def run_stage(config, stage):
                         tgt[:, ckpt_conv1.shape[1]:] = ckpt_conv1.mean(1, keepdim=True)
     else:
         if model_type == "segformer":
-            model = build_segformer(pretrained=True, in_channels=in_channels)
+            model = build_segformer(pretrained=True, in_channels=in_channels,
+                                    encoder_name=encoder_name)
         else:
             model = build_dlinknet(pretrained=True, in_channels=in_channels)
 
     model = model.to(device)
+
+    if cfg.get("grad_checkpoint", False):
+        try:
+            model.encoder.set_grad_checkpointing(True)
+            print(f"[{stage}] gradient checkpointing enabled")
+        except AttributeError:
+            pass
 
     n = len(RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"), augment=False))
     split = max(1, int(n * 0.1))
@@ -297,22 +322,23 @@ def run_stage(config, stage):
     scaler = torch.amp.GradScaler(device.type, enabled=(device.type == "cuda"))
 
     os.makedirs(os.path.dirname(cfg["checkpoint_out"]), exist_ok=True)
-    best_iou = 0.0
+    best_relaxed = 0.0
 
     for epoch in range(1, cfg["epochs"] + 1):
-        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device)
+        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, epoch=epoch)
         scheduler.step()
-        val_loss, val_iou, val_dice = validate(model, val_loader, device)
+        val_loss, val_iou, val_dice, val_relaxed = validate(model, val_loader, device)
 
-        print(f"[{stage}] epoch {epoch:3d}/{cfg['epochs']}  "
+        skel_flag = "skel+" if epoch >= 10 else "skel-"
+        print(f"[{stage}] epoch {epoch:3d}/{cfg['epochs']}  {skel_flag}  "
               f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}  "
-              f"iou={val_iou:.4f}  dice={val_dice:.4f}")
+              f"iou={val_iou:.4f}  dice={val_dice:.4f}  relaxed_iou={val_relaxed:.4f}")
 
-        if val_iou > best_iou:
-            best_iou = val_iou
+        if val_relaxed > best_relaxed:
+            best_relaxed = val_relaxed
             torch.save(model.state_dict(), cfg["checkpoint_out"])
 
-    print(f"[{stage}] best val iou={best_iou:.4f}  saved to {cfg['checkpoint_out']}")
+    print(f"[{stage}] best relaxed_iou={best_relaxed:.4f}  saved to {cfg['checkpoint_out']}")
     return model
 
 

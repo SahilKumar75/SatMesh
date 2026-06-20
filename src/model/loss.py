@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import segmentation_models_pytorch as smp
 
@@ -21,20 +20,26 @@ def soft_skel(x, iters=5):
     return skel
 
 
-def cl_dice_loss(pred_logits, target, iters=5, smooth=1.0):
+def skeleton_recall_loss(pred_logits, target, iters=5):
+    """Skeleton Recall Loss (Shit et al., ECCV 2024 — arxiv 2404.03010).
+
+    One-directional: GT skeleton × pred. Better than clDice for road connectivity.
+    Only activate after epoch 10 — early random predictions destabilize training.
+    """
     pred = torch.sigmoid(pred_logits)
-    sp = soft_skel(pred, iters)
     st = soft_skel(target, iters)
-    t_prec = ((sp * target).sum() + smooth) / (sp.sum() + smooth)
-    t_sens = ((st * pred).sum() + smooth) / (st.sum() + smooth)
-    return 1.0 - 2.0 * t_prec * t_sens / (t_prec + t_sens)
+    recall = (st * pred).sum() / (st.sum() + 1e-6)
+    return 1.0 - recall
 
 
 _dice = smp.losses.DiceLoss(mode="binary")
 
 
-def combined_loss(logits, target, w_dice=0.35, w_bce=0.30, w_cldice=0.35):
-    # pos_weight=5: roads ~15% of pixels, upweight to fix class imbalance
+def combined_loss(logits, target, use_skelrecall=True,
+                  w_dice=0.40, w_bce=0.30, w_skelrecall=0.30):
     pw = torch.tensor([5.0], device=logits.device)
     bce = F.binary_cross_entropy_with_logits(logits, target, pos_weight=pw)
-    return w_dice * _dice(logits, target) + w_bce * bce + w_cldice * cl_dice_loss(logits, target)
+    loss = w_dice * _dice(logits, target) + w_bce * bce
+    if use_skelrecall:
+        loss = loss + w_skelrecall * skeleton_recall_loss(logits, target)
+    return loss

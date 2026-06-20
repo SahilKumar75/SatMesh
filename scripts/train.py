@@ -43,15 +43,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--deepglobe", default=None, help="DeepGlobe train dir (else auto-download)")
     ap.add_argument("--india-dir", default=None, help="Sentinel-2 India tile dir for stage 2")
-    ap.add_argument("--epochs", type=int, default=30)
-    ap.add_argument("--epochs2", type=int, default=30)
-    ap.add_argument("--batch", type=int, default=16, help="stage-1 batch (L4 handles 16 @512)")
-    ap.add_argument("--batch2", type=int, default=8)
+    ap.add_argument("--epochs", type=int, default=40)
+    ap.add_argument("--epochs2", type=int, default=20)
+    ap.add_argument("--batch", type=int, default=4, help="stage-1 batch size")
+    ap.add_argument("--batch2", type=int, default=4)
     ap.add_argument("--img-size", type=int, default=512)
-    ap.add_argument("--subset", type=int, default=5000)
+    ap.add_argument("--subset", type=int, default=None, help="tile subset cap (None = full dataset)")
     ap.add_argument("--out", default="checkpoints")
     ap.add_argument("--skip-stage1", action="store_true")
     ap.add_argument("--model", default="segformer", choices=["segformer", "dlinknet"])
+    ap.add_argument("--encoder", default="mit_b0",
+                    choices=["mit_b0", "mit_b2", "mit_b3", "mit_b4"],
+                    help="MiT encoder variant (mit_b4 recommended for 70%+ IoU)")
+    ap.add_argument("--grad-checkpoint", action="store_true",
+                    help="enable gradient checkpointing (required for B3/B4 on 16GB GPU)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -62,11 +67,15 @@ def main():
         "stage1": {"data_dir": dg, "epochs": args.epochs, "batch": args.batch,
                    "lr": 1e-3, "img_size": args.img_size, "subset": args.subset,
                    "use_nir": False, "model": args.model,
+                   "encoder_name": args.encoder,
+                   "grad_checkpoint": args.grad_checkpoint,
                    "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
                    "epochs": args.epochs2, "batch": args.batch2, "lr": 5e-5,
                    "img_size": args.img_size, "subset": None, "use_nir": True,
                    "model": args.model,
+                   "encoder_name": args.encoder,
+                   "grad_checkpoint": args.grad_checkpoint,
                    "checkpoint_in": f"{args.out}/stage1.pth",
                    "checkpoint_out": f"{args.out}/{args.model}_india.pth"},
     }

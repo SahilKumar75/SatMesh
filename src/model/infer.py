@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from .dlinknet import build_dlinknet
 
@@ -46,7 +47,7 @@ _STD3  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
 def predict_mask(model, image_path, device, nir_path=None, img_size=512,
-                 threshold=0.5, in_channels=4):
+                 threshold=0.5, in_channels=4, tta=False, scales=None):
     raw = cv2.imread(image_path)
     if raw is None:
         raise FileNotFoundError(image_path)
@@ -69,8 +70,27 @@ def predict_mask(model, image_path, device, nir_path=None, img_size=512,
 
     tensor = torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().to(device)
 
-    with torch.no_grad():
-        prob = torch.sigmoid(model(tensor))[0, 0].float().cpu().numpy()
+    def _run(t):
+        with torch.no_grad():
+            return torch.sigmoid(model(t))[0, 0].float().cpu()
+
+    if scales:
+        probs = []
+        for s in scales:
+            t_s = F.interpolate(tensor, size=(s, s), mode="bilinear", align_corners=False)
+            p = _run(t_s)
+            p = F.interpolate(p.unsqueeze(0).unsqueeze(0), size=(img_size, img_size),
+                              mode="bilinear", align_corners=False)[0, 0]
+            probs.append(p)
+        prob = torch.stack(probs).mean(0).numpy()
+    elif tta:
+        p0 = _run(tensor)
+        p1 = _run(tensor.flip(-1)).flip(-1)
+        p2 = _run(tensor.flip(-2)).flip(-2)
+        p3 = _run(tensor.rot90(1, [-2, -1])).rot90(-1, [-2, -1])
+        prob = torch.stack([p0, p1, p2, p3]).mean(0).numpy()
+    else:
+        prob = _run(tensor).numpy()
 
     mask = (prob > threshold).astype(np.uint8) * 255
     if (h, w) != (img_size, img_size):
@@ -102,6 +122,10 @@ if __name__ == "__main__":
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--img_size", type=int, default=512)
     ap.add_argument("--in_channels", type=int, default=4, choices=[3, 4])
+    ap.add_argument("--tta", action="store_true",
+                    help="4-aug TTA: original+hflip+vflip+rot90, average sigmoids")
+    ap.add_argument("--scales", type=int, nargs="+", default=None,
+                    help="multi-scale sizes e.g. --scales 512 768 (use instead of --tta)")
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
@@ -117,7 +141,8 @@ if __name__ == "__main__":
         nir_path = f.replace("_sat.jpg", "_nir.tif").replace("_sat.png", "_nir.tif")
         nir_path = nir_path if (args.in_channels == 4 and os.path.exists(nir_path)) else None
         mask = predict_mask(model, f, device, nir_path=nir_path,
-                            img_size=args.img_size, in_channels=args.in_channels)
+                            img_size=args.img_size, in_channels=args.in_channels,
+                            tta=args.tta, scales=args.scales)
         cv2.imwrite(f"{args.out_dir}/{stem}_pred.png", mask)
 
     print(f"Saved {len(sat_files)} predictions → {args.out_dir}")

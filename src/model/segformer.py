@@ -6,28 +6,27 @@ import segmentation_models_pytorch as smp
 # Satisfies PS4 Objective 1: "Transformer-based deep learning architecture."
 
 
-def build_segformer(pretrained=True, in_channels=3):
+def build_segformer(pretrained=True, in_channels=3, encoder_name="mit_b0"):
     return smp.Segformer(
-        encoder_name="mit_b0",
+        encoder_name=encoder_name,
         encoder_weights="imagenet" if pretrained else None,
         in_channels=in_channels,
         classes=1,
     )
 
 
-# Verified: only encoder.patch_embed1.proj.weight changes between 3-ch and 4-ch.
-# Shape [32,3,7,7] → [32,4,7,7]. Exact key confirmed by running smp.Segformer().state_dict().
+# patch_embed1.proj.weight key is identical across MiT-B0 through B5.
 _PATCH1_KEY = "encoder.patch_embed1.proj.weight"
 
 
-def build_segformer_4ch(checkpoint_3ch=None, device="cpu"):
+def build_segformer_4ch(checkpoint_3ch=None, device="cpu", encoder_name="mit_b0"):
     """Load Stage-1 (3-ch) checkpoint into 4-ch Stage-2 SegFormer.
 
     Transfers patch_embed1 RGB weights exactly; inits NIR channel from their mean.
     strict=False load reports exactly 1 missing key (patch_embed1), 0 unexpected — verified.
     """
     model = smp.Segformer(
-        encoder_name="mit_b0",
+        encoder_name=encoder_name,
         encoder_weights=None,
         in_channels=4,
         classes=1,
