@@ -170,7 +170,9 @@ def download_sentinel_city(city_id: str, bbox: list, out_dir: Path):
             out_path = out_dir / f"{label}.tif"
             if not out_path.exists():
                 with rasterio.open(href) as src:
-                    window = from_bounds(west, south, east, north, src.transform)
+                    from rasterio.warp import transform_bounds as _tb
+                    left, bottom, right, top = _tb("EPSG:4326", src.crs, west, south, east, north)
+                    window = from_bounds(left, bottom, right, top, src.transform)
                     data = src.read(1, window=window)
                     transform = src.window_transform(window)
                     profile = src.profile.copy()
@@ -215,15 +217,16 @@ def download_osm_mask(city_id: str, bbox: list, out_dir: Path):
     print(f"  [OSM/{city_id}] downloading road graph...")
 
     try:
-        G = ox.graph_from_bbox(north, south, east, west, network_type="drive")
+        G = ox.graph_from_bbox((west, south, east, north), network_type="drive")
         ox.save_graphml(G, graph_path)
 
         H, W = 512, 512
         transform = from_bounds(west, south, east, north, W, H)
         edges = ox.graph_to_gdfs(G, nodes=False)
 
-        # buffer roads by ~5m for better mask coverage
-        edges_proj = edges.to_crs("EPSG:32643")
+        # buffer roads by ~5m for better mask coverage (auto UTM zone per city)
+        utm_crs = edges.estimate_utm_crs()
+        edges_proj = edges.to_crs(utm_crs)
         edges_proj["geometry"] = edges_proj.geometry.buffer(5)
         edges_reproj = edges_proj.to_crs("EPSG:4326")
 
