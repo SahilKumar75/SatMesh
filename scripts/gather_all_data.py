@@ -111,13 +111,13 @@ def download_spacenet(out_dir: Path):
     import subprocess
     result = subprocess.run([
         "kaggle", "datasets", "download",
-        "-d", "amerii/spacenet-7",
+        "-d", "selfishgene/urban-roads",
         "-p", str(out_dir), "--unzip"
     ], capture_output=True, text=True)
 
     if result.returncode != 0:
         print(f"  [ERROR] {result.stderr}")
-        print("  → Manual: https://www.kaggle.com/datasets/amerii/spacenet-7")
+        print("  → SpaceNet SN3 requires AWS access; skipping. DeepGlobe+OSM sufficient.")
         return
 
     done_flag.touch()
@@ -136,9 +136,58 @@ def download_sentinel_city(city_id: str, bbox: list, out_dir: Path):
         return
 
     print(f"  [Sentinel-2/{city_id}] downloading...")
-    from src.data.sentinel_dl import download_city
     try:
-        meta = download_city(city_id, bbox, str(out_dir))
+        import requests, rasterio
+        from rasterio.windows import from_bounds
+
+        STAC_URL = "https://planetarycomputer.microsoft.com/api/stac/v1/search"
+        south, west, north, east = bbox[0], bbox[1], bbox[2], bbox[3]
+        payload = {
+            "collections": ["sentinel-2-l2a"],
+            "bbox": [west, south, east, north],
+            "query": {"eo:cloud_cover": {"lt": 20}},
+            "sortby": [{"field": "properties.eo:cloud_cover", "direction": "asc"}],
+            "limit": 5,
+        }
+        r = requests.post(STAC_URL, json=payload, timeout=30)
+        r.raise_for_status()
+        features = r.json().get("features", [])
+        if not features:
+            print(f"  [ERROR] No Sentinel-2 tiles found for {city_id}")
+            return
+
+        item = features[0]
+        band_keys = {"B04": "red", "B03": "green", "B02": "blue", "B08": "nir"}
+        paths = {}
+        for band, label in band_keys.items():
+            href = item["assets"][band]["href"]
+            # sign asset
+            sr = requests.get(
+                f"https://planetarycomputer.microsoft.com/api/sas/v1/sign?href={href}",
+                timeout=15)
+            if sr.ok:
+                href = sr.json().get("href", href)
+            out_path = out_dir / f"{label}.tif"
+            if not out_path.exists():
+                with rasterio.open(href) as src:
+                    window = from_bounds(west, south, east, north, src.transform)
+                    data = src.read(1, window=window)
+                    transform = src.window_transform(window)
+                    profile = src.profile.copy()
+                    profile.update({"width": data.shape[1], "height": data.shape[0],
+                                    "transform": transform, "count": 1})
+                    with rasterio.open(out_path, "w", **profile) as dst:
+                        dst.write(data, 1)
+            paths[label] = str(out_path)
+
+        with rasterio.open(paths["red"]) as src:
+            t = src.transform
+            meta = {"width": src.width, "height": src.height, "paths": paths,
+                    "top_left_lat": float(t.f), "top_left_lon": float(t.c)}
+
+        import json
+        with open(out_dir / "sentinel_meta.json", "w") as f:
+            json.dump(meta, f, indent=2)
         print(f"  done: {meta['width']}x{meta['height']} px")
     except Exception as e:
         print(f"  [ERROR] {e}")
