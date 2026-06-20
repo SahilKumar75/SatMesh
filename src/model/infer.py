@@ -114,10 +114,12 @@ def predict_mask(model, image_path, device, nir_path=None, img_size=512,
     return postprocess_mask(mask)
 
 
-def load_model(checkpoint_path, device, model_type="segformer", in_channels=4):
+def load_model(checkpoint_path, device, model_type="segformer", in_channels=4,
+               encoder_name="mit_b0"):
     if model_type == "segformer":
         from .segformer import build_segformer
-        model = build_segformer(pretrained=False, in_channels=in_channels).to(device)
+        model = build_segformer(pretrained=False, in_channels=in_channels,
+                                encoder_name=encoder_name).to(device)
     else:
         model = build_dlinknet(pretrained=False, in_channels=in_channels).to(device)
     state = torch.load(checkpoint_path, map_location=device, weights_only=True)
@@ -138,6 +140,9 @@ if __name__ == "__main__":
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--img_size", type=int, default=512)
     ap.add_argument("--in_channels", type=int, default=4, choices=[3, 4])
+    ap.add_argument("--encoder", default="mit_b0",
+                    choices=["mit_b0", "mit_b2", "mit_b3", "mit_b4"],
+                    help="must match encoder used during training")
     ap.add_argument("--tta", action="store_true",
                     help="4-aug TTA: original+hflip+vflip+rot90, average sigmoids")
     ap.add_argument("--scales", type=int, nargs="+", default=None,
@@ -149,7 +154,8 @@ if __name__ == "__main__":
 
     os.makedirs(args.out_dir, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = load_model(args.checkpoint, device, args.model, in_channels=args.in_channels)
+    model = load_model(args.checkpoint, device, args.model, in_channels=args.in_channels,
+                       encoder_name=args.encoder)
 
     sat_files = sorted(glob.glob(f"{args.sat_dir}/*_sat.jpg"))
     if not sat_files:
