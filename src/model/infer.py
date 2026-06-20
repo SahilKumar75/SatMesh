@@ -39,27 +39,35 @@ def postprocess_mask(mask):
     return cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel2)
 
 
-_MEAN = np.array([0.485, 0.456, 0.406, 0.4], dtype=np.float32)
-_STD  = np.array([0.229, 0.224, 0.225, 0.2], dtype=np.float32)
+_MEAN4 = np.array([0.485, 0.456, 0.406, 0.4], dtype=np.float32)
+_STD4  = np.array([0.229, 0.224, 0.225, 0.2], dtype=np.float32)
+_MEAN3 = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+_STD3  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
-def predict_mask(model, image_path, device, nir_path=None, img_size=512, threshold=0.5):
+def predict_mask(model, image_path, device, nir_path=None, img_size=512,
+                 threshold=0.5, in_channels=4):
     raw = cv2.imread(image_path)
     if raw is None:
         raise FileNotFoundError(image_path)
     h, w = raw.shape[:2]
 
-    if nir_path is not None:
-        import rasterio
-        with rasterio.open(nir_path) as src:
-            nir = src.read(1).astype(np.float32)
-        img4 = stack_nir(raw, nir)
+    if in_channels == 3:
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        img = cv2.resize(rgb, (img_size, img_size))
+        img = (img - _MEAN3) / _STD3
     else:
-        img4 = approximate_nir(raw)
+        if nir_path is not None:
+            import rasterio
+            with rasterio.open(nir_path) as src:
+                nir = src.read(1).astype(np.float32)
+            img = stack_nir(raw, nir)
+        else:
+            img = approximate_nir(raw)
+        img = cv2.resize(img, (img_size, img_size))
+        img = (img - _MEAN4) / _STD4
 
-    img4 = cv2.resize(img4, (img_size, img_size))
-    img4 = (img4 - _MEAN) / _STD
-    tensor = torch.from_numpy(img4.transpose(2, 0, 1)).unsqueeze(0).float().to(device)
+    tensor = torch.from_numpy(img.transpose(2, 0, 1)).unsqueeze(0).float().to(device)
 
     with torch.no_grad():
         prob = torch.sigmoid(model(tensor))[0, 0].float().cpu().numpy()
@@ -93,11 +101,12 @@ if __name__ == "__main__":
     ap.add_argument("--sat_dir", required=True)
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--img_size", type=int, default=512)
+    ap.add_argument("--in_channels", type=int, default=4, choices=[3, 4])
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = load_model(args.checkpoint, device, args.model)
+    model = load_model(args.checkpoint, device, args.model, in_channels=args.in_channels)
 
     sat_files = sorted(glob.glob(f"{args.sat_dir}/*_sat.jpg"))
     if not sat_files:
@@ -106,8 +115,9 @@ if __name__ == "__main__":
     for f in sat_files:
         stem = os.path.basename(f).replace("_sat.jpg", "").replace("_sat.png", "")
         nir_path = f.replace("_sat.jpg", "_nir.tif").replace("_sat.png", "_nir.tif")
-        nir_path = nir_path if os.path.exists(nir_path) else None
-        mask = predict_mask(model, f, device, nir_path=nir_path, img_size=args.img_size)
+        nir_path = nir_path if (args.in_channels == 4 and os.path.exists(nir_path)) else None
+        mask = predict_mask(model, f, device, nir_path=nir_path,
+                            img_size=args.img_size, in_channels=args.in_channels)
         cv2.imwrite(f"{args.out_dir}/{stem}_pred.png", mask)
 
     print(f"Saved {len(sat_files)} predictions → {args.out_dir}")
