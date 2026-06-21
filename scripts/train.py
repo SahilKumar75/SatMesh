@@ -96,7 +96,7 @@ def main():
                    "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
                    "epochs": args.epochs2, "batch": args.batch2, "lr": 5e-5,
-                   "img_size": args.img_size, "subset": None, "use_nir": True,
+                   "img_size": args.img_size, "subset": args.subset, "use_nir": True,
                    "model": args.model,
                    "encoder_name": args.encoder,
                    "grad_checkpoint": args.grad_checkpoint,

@@ -23,6 +23,8 @@ import sys
 
 # ── CONFIG — edit these ───────────────────────────────────────────────────────
 MODE = "india"   # "highres" (Checkpoint B) or "india" (Checkpoint A)
+POC  = True      # True = fast proof-of-concept (subset, fewer epochs, 384px ~30min)
+                 # False = full Checkpoint A run (35ep, 512px ~3h)
 
 REPO = "https://github.com/SahilKumar75/SatMesh.git"
 ROOT = "/kaggle/working/SatMesh"
@@ -85,11 +87,16 @@ elif MODE == "india":
     os.makedirs("checkpoints/b4_india", exist_ok=True)
     shutil.copy(STAGE1_CKPT, "checkpoints/b4_india/stage1.pth")
     # 4c. Fine-tune (stage-2 only). T4-sized batch.
-    run([sys.executable, "scripts/train.py", "--skip-stage1",
-         "--india-dir", "data/sentinel2_india/train",
-         "--encoder", "mit_b4", "--model", "segformer",
-         "--img-size", "512", "--batch2", "8", "--epochs2", "35", "--clahe",
-         "--out", "checkpoints/b4_india"])
+    img   = "384" if POC else "512"
+    eps   = "12"  if POC else "35"
+    cmd = [sys.executable, "scripts/train.py", "--skip-stage1",
+           "--india-dir", "data/sentinel2_india/train",
+           "--encoder", "mit_b4", "--model", "segformer",
+           "--img-size", img, "--batch2", "8", "--epochs2", eps, "--clahe",
+           "--out", "checkpoints/b4_india"]
+    if POC:
+        cmd += ["--subset", "1500"]   # cap tiles for a ~30min PoC
+    run(cmd)
     produced = "checkpoints/b4_india/segformer_india.pth"
     final = os.path.join(OUT_DIR, "segformer_india_s2.pth")
 
