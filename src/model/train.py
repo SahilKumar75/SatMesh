@@ -276,9 +276,14 @@ def run_stage(config, stage):
 
     model = model.to(device)
 
+    if torch.cuda.device_count() > 1:
+        print(f"[{stage}] using {torch.cuda.device_count()} GPUs via DataParallel")
+        model = torch.nn.DataParallel(model)
+
     if cfg.get("grad_checkpoint", False):
         try:
-            model.encoder.set_grad_checkpointing(True)
+            m = model.module if hasattr(model, "module") else model
+            m.encoder.set_grad_checkpointing(True)
             print(f"[{stage}] gradient checkpointing enabled")
         except AttributeError:
             pass
@@ -336,7 +341,8 @@ def run_stage(config, stage):
 
         if val_relaxed > best_relaxed:
             best_relaxed = val_relaxed
-            torch.save(model.state_dict(), cfg["checkpoint_out"])
+            state = model.module.state_dict() if hasattr(model, "module") else model.state_dict()
+            torch.save(state, cfg["checkpoint_out"])
 
     print(f"[{stage}] best relaxed_iou={best_relaxed:.4f}  saved to {cfg['checkpoint_out']}")
     return model
