@@ -302,9 +302,11 @@ def run_stage(config, stage):
     val_subset = Subset(val_ds, indices[train_size:])
 
     train_loader = DataLoader(train_ds, batch_size=cfg["batch"], shuffle=True,
-                              num_workers=4, pin_memory=True, drop_last=True)
+                              num_workers=4, pin_memory=True, drop_last=True,
+                              persistent_workers=True, prefetch_factor=2)
     val_loader = DataLoader(val_subset, batch_size=cfg["batch"], shuffle=False,
-                            num_workers=4, pin_memory=True)
+                            num_workers=4, pin_memory=True,
+                            persistent_workers=True, prefetch_factor=2)
 
     if stage == "stage2":
         # Stage-2: encoder already pretrained — keep it slow to avoid catastrophic
