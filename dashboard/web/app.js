@@ -37,6 +37,17 @@ const ZONE_COLORS = ['match', ['get', 'zone'],
   '#3a3f45',
 ];
 
+// Interpolate edge color by criticality_score (0→gray, 0.1→yellow, 0.2+→red)
+const EDGE_HEATMAP_COLOR = [
+  'interpolate', ['linear'], ['coalesce', ['get', 'criticality_score'], 0],
+  0.00, '#2d3f5c',
+  0.05, '#7a6e2a',
+  0.10, '#c09145',
+  0.15, '#c07045',
+  0.20, '#c45a5a',
+  0.25, '#ff2222',
+];
+
 /* ── Clock ──────────────────────────────────────────────────── */
 function startClock() {
   function tick() {
@@ -84,6 +95,21 @@ function addGraphSources() {
         ['boolean', ['get', 'synthetic'], false], 2.5, 1.8,
       ],
       'line-opacity': 0.88,
+    },
+  });
+
+  // Heatmap edge layer (hidden by default)
+  map.addLayer({
+    id: 'edges-heatmap', type: 'line', source: 'edges',
+    filter: ['==', '$type', 'LineString'],
+    layout: { 'visibility': 'none' },
+    paint: {
+      'line-color': EDGE_HEATMAP_COLOR,
+      'line-width': ['interpolate', ['linear'],
+        ['coalesce', ['get', 'criticality_score'], 0],
+        0, 1.5, 0.25, 5,
+      ],
+      'line-opacity': 0.95,
     },
   });
 
@@ -183,6 +209,7 @@ window.disableNodeById = async function(nodeId) {
     if (st) st.textContent =
       `Node #${nodeId} disabled · LCC: ${(data.lcc_fraction * 100).toFixed(1)}% · Fragments: ${data.components_after}`;
     if (activePopup) { activePopup.remove(); activePopup = null; }
+    if (typeof computeRoute === 'function') computeRoute(true);
   } catch (e) { console.warn('disable node failed', e); }
 };
 
@@ -222,11 +249,12 @@ function setLayerMode(mode) {
   if (mode === 'satellite') ensureSatLayer();
 
   const show = (id, v) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none'); };
-  show('nodes-layer',    mode === 'graph');
-  show('edges-layer',    mode === 'graph');
-  show('road-mask-layer', mode === 'mask');
-  show('sat-layer',      mode === 'satellite');
-  show('osm-dark',       mode !== 'satellite');
+  show('edges-layer',      mode === 'graph');
+  show('edges-heatmap',    mode === 'heatmap');
+  show('nodes-layer',      mode === 'graph' || mode === 'heatmap');
+  show('road-mask-layer',  mode === 'mask');
+  show('sat-layer',        mode === 'satellite');
+  show('osm-dark',         mode !== 'satellite');
 }
 
 /* ── SSE pipeline stream ────────────────────────────────────── */

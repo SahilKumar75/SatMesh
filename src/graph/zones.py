@@ -55,12 +55,16 @@ def zones_to_geojson(G: nx.Graph, zones: dict, bc: dict) -> dict:
         u_lon = G.nodes[u].get("lon", 0.0)
         v_lat = G.nodes[v].get("lat", 0.0)
         v_lon = G.nodes[v].get("lon", 0.0)
+        crit = round(float((bc.get(u, 0.0) + bc.get(v, 0.0)) / 2.0), 6)
         edge_features.append({
             "type": "Feature",
             "geometry": {"type": "LineString", "coordinates": [[u_lon, u_lat], [v_lon, v_lat]]},
             "properties": {
+                "u": int(u),
+                "v": int(v),
                 "length_m": round(float(edata.get("length", 0.0)), 2),
                 "synthetic": bool(edata.get("synthetic", False)),
+                "criticality_score": crit,
             },
         })
 

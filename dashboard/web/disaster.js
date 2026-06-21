@@ -74,12 +74,23 @@ function topGatekeeperIds(n) {
     .slice(0, n).map(f => f.properties.id);
 }
 
-async function computeRoute() {
+let _baselineRouteM = null;
+
+async function computeRoute(autoTriggered = false) {
   if (!currentCity) return;
   const src = parseInt(document.getElementById('sel-from').value, 10);
   const dst = parseInt(document.getElementById('sel-to').value, 10);
   if (isNaN(src) || isNaN(dst)) return;
   try {
+    // Compute baseline (no disabled nodes) for delta display
+    if (_baselineRouteM === null || (!autoTriggered && disabledNodes.length === 0)) {
+      const base = await fetch(`/cities/${currentCity.id}/reroute`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ src, dst, disabled_nodes: [] }),
+      }).then(r => r.json());
+      if (base.reachable) _baselineRouteM = base.length_m;
+    }
+
     const res = await fetch(`/cities/${currentCity.id}/reroute`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ src, dst, disabled_nodes: disabledNodes }),
@@ -96,7 +107,14 @@ async function computeRoute() {
       type: 'FeatureCollection',
       features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }],
     });
-    toast(`Route: ${r.path.length} hops · ${(r.length_m / 1000).toFixed(2)} km`, 'ok');
+    const km = (r.length_m / 1000).toFixed(2);
+    let deltaStr = '';
+    if (_baselineRouteM && r.length_m > _baselineRouteM) {
+      const pct = (((r.length_m - _baselineRouteM) / _baselineRouteM) * 100).toFixed(0);
+      deltaStr = ` · +${pct}% travel time`;
+    }
+    const kind = deltaStr ? 'warn' : 'ok';
+    toast(`Route: ${r.path.length} hops · ${km} km${deltaStr}`, kind);
   } catch (e) { toast('Reroute failed', 'bad'); }
 }
 
@@ -112,7 +130,7 @@ function wireDisasterControls() {
     runScenario('earthquake', { lat: c.lat, lon: c.lng, radius_m: 1500 });
   });
   on('sc-collapse', () => runScenario('collapse', { node_ids: topGatekeeperIds(3) }));
-  on('sc-reset', () => { disabledNodes.length = 0; clearOverlays(); toast('Network restored', 'ok'); });
+  on('sc-reset', () => { disabledNodes.length = 0; _baselineRouteM = null; clearOverlays(); toast('Network restored', 'ok'); });
   on('btn-route', computeRoute);
 }
 
