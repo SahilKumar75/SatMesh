@@ -7,51 +7,50 @@
 
 /* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  /* Background strata — neutral, no blue cast */
-  --bg:      #08090a;
-  --surf:    #0d0f10;
-  --panel:   #111315;
-  --panel2:  #161819;
-  --panel3:  #1b1d1f;
+  /* Background strata — neutral grey, ChatGPT-style */
+  --bg:      #1a1a1a;
+  --surf:    #141414;
+  --panel:   #1e1e1e;
+  --panel2:  #252525;
+  --panel3:  #2e2e2e;
 
   /* Borders */
-  --bdr:     #222527;
-  --bdr2:    #2c3032;
+  --bdr:     #383838;
+  --bdr2:    #454545;
 
   /* Text */
-  --tx:      #d8dde4;
-  --tx2:     #7a8492;
-  --tx3:     #464d56;
+  --tx:      #e8e8e8;
+  --tx2:     #888888;
+  --tx3:     #555555;
 
-  /* Functional — desaturated, ISRO-appropriate */
-  --crit:    #c45a5a;
-  --warn:    #c09145;
-  --ok:      #4d8a5c;
-  --flood:   #4a6fa0;
-  --synth:   #7865a8;
-  --route:   #3d8888;
+  /* Functional — one clear signal each, muted */
+  --crit:    #b05050;
+  --warn:    #a87e38;
+  --ok:      #428050;
+  --flood:   #405880;
+  --synth:   #685888;
+  --route:   #347878;
   --accent:  #c8913a;
 
   /* Muted fills */
-  --crit-d:  rgba(196,90,90,.12);
-  --warn-d:  rgba(192,145,69,.10);
-  --ok-d:    rgba(77,138,92,.10);
-  --flood-d: rgba(74,111,160,.12);
-  --synth-d: rgba(120,101,168,.12);
-  --acc-d:   rgba(200,145,58,.08);
+  --crit-d:  rgba(176,80,80,.12);
+  --warn-d:  rgba(168,126,56,.10);
+  --ok-d:    rgba(66,128,80,.10);
+  --flood-d: rgba(64,88,128,.12);
+  --synth-d: rgba(104,88,136,.12);
+  --acc-d:   rgba(200,145,58,.09);
 
   /* Layout */
-  --tb-h:  50px;
   --sb-l:  272px;
   --sb-r:  290px;
 
   /* Shape */
-  --r:     6px;
-  --r-sm:  4px;
+  --r:     5px;
+  --r-sm:  3px;
 
   /* Type */
-  --f:     'Inter', system-ui, sans-serif;
-  --mono:  'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
+  --f:     'Inter', system-ui, -apple-system, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
 }
 
 /* ── Reset ──────────────────────────────────────────────────── */
@@ -74,130 +73,128 @@ sub { font-size: 0.7em; vertical-align: sub; }
 body { display: flex; flex-direction: column; }
 
 /* ══════════════════════════════════════════════════════════════
-   TOP BAR
+   BRAND BLOCK — top of left sidebar
    ══════════════════════════════════════════════════════════════ */
-.topbar {
-  height: var(--tb-h);
-  flex-shrink: 0;
-  background: var(--surf);
-  border-bottom: 1px solid var(--bdr);
-  display: flex;
-  align-items: center;
-  z-index: 100;
-}
-
-/* Brand section */
-.tb-brand {
+.brand-block {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 16px;
-  height: 100%;
-  border-right: 1px solid var(--bdr);
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
 }
-.tb-logo  { color: var(--accent); flex-shrink: 0; }
-.tb-name  { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; white-space: nowrap; }
+.tb-name  { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; white-space: nowrap; color: var(--tx); }
 .tb-badge {
-  font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.7px;
+  font-size: 9px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--tx3);
-  padding: 3px 7px;
-  background: var(--panel2);
+  padding: 2px 6px;
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
   white-space: nowrap;
 }
 
-/* Pipeline controls */
-.tb-controls {
-  flex: 1;
-  display: flex;
+/* ══════════════════════════════════════════════════════════════
+   COMMAND BAR — floating capsule dock, centered above map
+   ══════════════════════════════════════════════════════════════ */
+.cmd-bar {
+  position: fixed;
+  bottom: 18px;
+  left: calc(var(--sb-l) + (100vw - var(--sb-l) - var(--sb-r)) / 2);
+  transform: translateX(-50%);
+  z-index: 200;
+
+  display: inline-flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 16px;
-  min-width: 0;
+  gap: 4px;
+
+  background: var(--panel2);
+  border: 1px solid var(--bdr2);
+  border-radius: 100px;
+  padding: 5px 10px;
+  box-shadow: 0 6px 28px rgba(0,0,0,.6), 0 1px 4px rgba(0,0,0,.4);
+  white-space: nowrap;
 }
+.cmd-s       { display: inline-flex; align-items: center; gap: 8px; }
+.cmd-s-right { gap: 7px; }
+.cmd-sep {
+  width: 1px; height: 14px;
+  background: var(--bdr2); flex-shrink: 0;
+  margin: 0 2px;
+}
+
+/* Controls shared between topbar era and cmd-bar */
 .ctrl-group { display: flex; align-items: center; gap: 7px; }
 .ctrl-lbl {
-  font-size: 10px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.6px;
+  font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--tx3); white-space: nowrap;
 }
 .city-sel {
-  background: var(--panel2);
+  background: var(--panel3);
   color: var(--tx);
   border: 1px solid var(--bdr2);
-  border-radius: var(--r);
-  padding: 6px 10px;
-  font-size: 13px; font-weight: 500;
+  border-radius: 100px;
+  padding: 4px 10px;
+  font-size: 12px; font-weight: 500;
+  font-family: var(--f);
   outline: none; cursor: pointer;
 }
 .city-sel:focus { border-color: var(--accent); }
 
-/* Custom live toggle */
+/* Live toggle */
 .live-wrap {
   display: flex; align-items: center; gap: 7px;
   cursor: pointer; user-select: none; flex-shrink: 0;
 }
 .live-chk { display: none; }
 .live-track {
-  width: 32px; height: 17px;
+  width: 30px; height: 16px;
   background: var(--panel3); border: 1px solid var(--bdr2);
-  border-radius: 9px; position: relative;
+  border-radius: 8px; position: relative;
   transition: background .18s, border-color .18s;
   flex-shrink: 0;
 }
 .live-thumb {
   position: absolute; top: 2px; left: 2px;
-  width: 11px; height: 11px;
+  width: 10px; height: 10px;
   background: var(--tx3); border-radius: 50%;
   transition: left .18s, background .18s;
 }
 .live-chk:checked ~ .live-track { background: var(--acc-d); border-color: var(--accent); }
-.live-chk:checked ~ .live-track .live-thumb { left: 17px; background: var(--accent); }
+.live-chk:checked ~ .live-track .live-thumb { left: 16px; background: var(--accent); }
 .live-lbl { font-size: 12px; color: var(--tx2); font-weight: 500; white-space: nowrap; }
 
 .run-btn {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 5px;
   background: var(--accent); color: #1a0e00;
   font-size: 12px; font-weight: 700;
-  border: none; border-radius: var(--r);
-  padding: 7px 14px; letter-spacing: 0.2px;
+  font-family: var(--f);
+  border: none; border-radius: 100px;
+  padding: 5px 13px; letter-spacing: 0.1px;
   transition: opacity .15s; white-space: nowrap;
   flex-shrink: 0;
 }
 .run-btn:hover    { opacity: .85; }
-.run-btn:disabled { opacity: .38; cursor: not-allowed; }
+.run-btn:disabled { opacity: .35; cursor: not-allowed; }
 
-/* Telemetry section */
-.tb-tele {
-  display: flex; align-items: center; gap: 14px;
-  padding: 0 16px; height: 100%;
-  border-left: 1px solid var(--bdr); flex-shrink: 0;
-}
-.src-tags    { display: flex; gap: 5px; }
+/* Telemetry in cmd-bar */
 .src-tag {
   font-size: 9px; font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.5px;
+  text-transform: uppercase; letter-spacing: 0.4px;
   padding: 2px 6px;
-  background: transparent; color: var(--tx3);
+  color: var(--tx3);
   border: 1px solid var(--bdr);
   border-radius: var(--r-sm);
 }
-.tele-dot-wrap { display: flex; align-items: center; gap: 6px; }
 .status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
   background: var(--tx3); flex-shrink: 0;
 }
 .status-dot.ready   { background: var(--ok); }
 .status-dot.running { background: var(--warn); animation: pulse 1s infinite; }
 .status-dot.not_run { background: var(--tx3); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .2; } }
-.status-lbl {
-  font-size: 10px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.6px; color: var(--tx2);
-}
 .tele-clock { font-family: var(--mono); font-size: 11px; color: var(--tx3); }
 
 /* ══════════════════════════════════════════════════════════════

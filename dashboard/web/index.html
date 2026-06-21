@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SatMesh · Urban Road Resilience · ISRO BAH 2026</title>
-  <meta name="theme-color" content="#08090a" />
+  <meta name="theme-color" content="#141414" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><rect x='0' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><circle cx='17' cy='17' r='2.2' fill='%23c45a5a'/></svg>" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,65 +14,35 @@
 </head>
 <body>
 
-  <!-- ══ TOP BAR ══════════════════════════════════════════════ -->
-  <header class="topbar">
-    <div class="tb-brand">
-      <svg class="tb-logo" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="0"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="5"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="10" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="15" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="0"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="5"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="10" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="15" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="0"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="5"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="10" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="15" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="0"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="5"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <rect x="10" y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
-        <circle cx="17" cy="17" r="2.2" fill="#c45a5a"/>
-      </svg>
-      <span class="tb-name">SatMesh</span>
-      <span class="tb-badge">ISRO BAH 2026 · PS4</span>
-    </div>
-
-    <div class="tb-controls">
-      <div class="ctrl-group">
-        <label class="ctrl-lbl" for="city-select">City</label>
-        <select id="city-select" class="city-sel"></select>
-      </div>
-      <label class="live-wrap" title="Live = run model on GPU. Off = replay pre-computed log.">
-        <input type="checkbox" id="live-toggle" class="live-chk" />
-        <span class="live-track"><span class="live-thumb"></span></span>
-        <span class="live-lbl">Live GPU</span>
-      </label>
-      <button id="run-btn" class="run-btn">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        Run Pipeline
-      </button>
-    </div>
-
-    <div class="tb-tele">
-      <div class="src-tags">
-        <span class="src-tag">Sentinel-2 · 10m</span>
-        <span class="src-tag">OSM Ground Truth</span>
-      </div>
-      <div class="tele-dot-wrap">
-        <span class="status-dot" id="status-dot"></span>
-        <span class="status-lbl" id="status-lbl">OFFLINE</span>
-      </div>
-      <time class="tele-clock" id="tele-clock">--:--:-- UTC</time>
-    </div>
-  </header>
-
   <!-- ══ LAYOUT ════════════════════════════════════════════════ -->
   <div class="layout">
 
     <!-- ── LEFT SIDEBAR ── -->
     <aside class="sidebar sidebar-l" aria-label="Network metrics and status">
+
+      <!-- Brand -->
+      <div class="brand-block">
+        <svg width="18" height="18" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="0"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="5"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="10" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="15" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="0"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="5"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="10" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="15" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="0"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="5"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="10" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="15" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="0"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="5"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <rect x="10" y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+          <circle cx="17" cy="17" r="2.2" fill="#c45a5a"/>
+        </svg>
+        <span class="tb-name">SatMesh</span>
+        <span class="tb-badge">ISRO BAH 2026 · PS4</span>
+      </div>
 
       <!-- Pipeline progress (hidden when idle) -->
       <section class="pane" id="pipeline-pane" style="display:none">
@@ -223,6 +193,33 @@
 
     </aside>
   </div>
+
+  <!-- ══ COMMAND BAR (bottom) ══════════════════════════════════ -->
+  <footer class="cmd-bar">
+    <div class="cmd-s">
+      <div class="ctrl-group">
+        <label class="ctrl-lbl" for="city-select">City</label>
+        <select id="city-select" class="city-sel"></select>
+      </div>
+      <span class="cmd-sep"></span>
+      <label class="live-wrap">
+        <input type="checkbox" id="live-toggle" class="live-chk" />
+        <span class="live-track"><span class="live-thumb"></span></span>
+        <span class="live-lbl">Live GPU</span>
+      </label>
+      <button id="run-btn" class="run-btn">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Run Pipeline
+      </button>
+    </div>
+    <div class="cmd-s cmd-s-right">
+      <span class="src-tag">Sentinel-2 · 10m</span>
+      <span class="src-tag">OSM Ground Truth</span>
+      <span class="cmd-sep"></span>
+      <span class="status-dot" id="status-dot"></span>
+      <time class="tele-clock" id="tele-clock">--:--:-- UTC</time>
+    </div>
+  </footer>
 
   <!-- Toast notification -->
   <div class="toast" id="scenario-toast" role="status" aria-live="polite"></div>

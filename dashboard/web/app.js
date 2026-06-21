@@ -17,7 +17,7 @@ const DARK_STYLE = {
     },
   },
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#08090a' } },
+    { id: 'bg', type: 'background', paint: { 'background-color': '#1a1a1a' } },
     {
       id: 'osm-dark', type: 'raster', source: 'osm',
       paint: {
@@ -300,9 +300,7 @@ function renderSteps(container, current, doneSet) {
 /* ── Status dot + label ─────────────────────────────────────── */
 function updateStatusDot(status) {
   const dot = document.getElementById('status-dot');
-  const lbl = document.getElementById('status-lbl');
   if (dot) dot.className = 'status-dot ' + status;
-  if (lbl) lbl.textContent = { ready: 'LIVE', running: 'RUNNING', not_run: 'OFFLINE' }[status] || 'OFFLINE';
 }
 
 /* ── Bootstrap ──────────────────────────────────────────────── */
