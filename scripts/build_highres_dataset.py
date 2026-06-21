@@ -144,18 +144,31 @@ def build_region(cid, cfg, out_dir, z, grid, windows, tile, buffer_px,
     return n
 
 
-def resolve_regions(spec):
-    from src.data.city_config import load_all
-    cities = load_all()
+def _load_regions_file(path):
+    """Load a {id: {name, bbox, terrain}} JSON into objects with .bbox/.terrain."""
+    import json
+    from types import SimpleNamespace
+    with open(path) as f:
+        raw = json.load(f)
+    return {k: SimpleNamespace(bbox=v["bbox"], terrain=v.get("terrain", "urban"),
+                               name=v.get("name", k)) for k, v in raw.items()}
+
+
+def resolve_regions(spec, regions_file=None):
+    if regions_file:
+        src = _load_regions_file(regions_file)
+    else:
+        from src.data.city_config import load_all
+        src = load_all()
     if spec in (None, "", "none"):
         return {}
     if spec == "all":
-        return cities
+        return src
     out = {}
     for cid in [s.strip() for s in spec.split(",") if s.strip()]:
-        if cid not in cities:
-            raise KeyError(f"region '{cid}' not in cities.json")
-        out[cid] = cities[cid]
+        if cid not in src:
+            raise KeyError(f"region '{cid}' not in region source")
+        out[cid] = src[cid]
     return out
 
 
@@ -163,7 +176,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--regions", default="all",
-                    help="'all', 'none', or comma-separated cities.json ids")
+                    help="'all', 'none', or comma-separated region ids")
+    ap.add_argument("--regions-file", default="data/train_regions.json",
+                    help="JSON of {id:{name,bbox,terrain}}; default = rich 28-region set")
     ap.add_argument("--zoom", type=int, default=18,
                     help="XYZ zoom (18~0.6m, 17~1.2m, 19~0.3m)")
     ap.add_argument("--grid", type=int, default=4, help="tiles per window side (GxG)")
@@ -182,7 +197,7 @@ def main():
     session = requests.Session()
 
     total = 0
-    for cid, cfg in resolve_regions(args.regions).items():
+    for cid, cfg in resolve_regions(args.regions, args.regions_file).items():
         try:
             total += build_region(cid, cfg, out_dir, args.zoom, args.grid,
                                    args.windows, args.tile, args.buffer_px,
