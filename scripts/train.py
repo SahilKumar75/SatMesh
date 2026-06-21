@@ -4,8 +4,22 @@
 Stage 1 pretrains D-LinkNet on DeepGlobe (auto-downloaded via kagglehub).
 Stage 2 fine-tunes on a Sentinel-2 India tile dir (RGB+NIR), if provided.
 
-Examples
---------
+Two target checkpoints (multi-resolution strategy)
+---------------------------------------------------
+    # Checkpoint B — high-res 0.5m (DeepGlobe/SpaceNet), strict-IoU target >=0.70.
+    # H200: mit_b4 @768px, bf16 + grad-checkpoint. No --india-dir => stage2 skipped,
+    # stage1 weights saved as the high-res checkpoint.
+    python scripts/train.py --encoder mit_b4 --img-size 768 --batch 14 \
+        --grad-checkpoint --epochs 50
+
+    # Checkpoint A — Sentinel-2 10m India (dashboard), relaxed-IoU target >=0.55.
+    # Resume from a high-res stage1.pth, fine-tune on India tiles with CLAHE.
+    python scripts/train.py --skip-stage1 \
+        --india-dir data/sentinel2_india/train \
+        --encoder mit_b4 --img-size 512 --batch 28 --clahe
+
+Other examples
+--------------
     # Stage 1 only (DeepGlobe), L4-sized batch:
     python scripts/train.py --batch 16 --epochs 30
 
@@ -54,9 +68,11 @@ def main():
     ap.add_argument("--model", default="segformer", choices=["segformer", "dlinknet"])
     ap.add_argument("--encoder", default="mit_b0",
                     choices=["mit_b0", "mit_b2", "mit_b3", "mit_b4"],
-                    help="MiT encoder variant (mit_b4 recommended for 70%+ IoU)")
+                    help="MiT encoder variant (mit_b4 recommended for 70%%+ IoU)")
     ap.add_argument("--grad-checkpoint", action="store_true",
                     help="enable gradient checkpointing (required for B3/B4 on 16GB GPU)")
+    ap.add_argument("--clahe", action="store_true",
+                    help="CLAHE+gamma enhance inputs (recommended for 10m Sentinel-2 stage-2)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -69,6 +85,7 @@ def main():
                    "use_nir": False, "model": args.model,
                    "encoder_name": args.encoder,
                    "grad_checkpoint": args.grad_checkpoint,
+                   "use_clahe": False,
                    "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
                    "epochs": args.epochs2, "batch": args.batch2, "lr": 5e-5,
@@ -76,6 +93,7 @@ def main():
                    "model": args.model,
                    "encoder_name": args.encoder,
                    "grad_checkpoint": args.grad_checkpoint,
+                   "use_clahe": args.clahe,
                    "checkpoint_in": f"{args.out}/stage1.pth",
                    "checkpoint_out": f"{args.out}/{args.model}_india.pth"},
     }

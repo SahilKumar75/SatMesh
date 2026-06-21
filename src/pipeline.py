@@ -14,6 +14,7 @@ def run_pipeline(
     force_rerun: bool = False,
     model_type: str = "segformer",
     encoder_name: str = "mit_b4",
+    min_nodes: int = 20,
 ) -> Generator[dict, None, None]:
     import torch
     from src.data.city_config import load_city
@@ -43,6 +44,12 @@ def run_pipeline(
         log.append(ev)
         yield ev
 
+    # Outputs are written to a fresh staging dir and only promoted into out_dir
+    # on success. This prevents a degenerate run (e.g. a resolution/domain
+    # mismatched model that finds ~9 nodes) from clobbering known-good outputs.
+    run_dir = out_dir / f"run_{int(time.time())}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
     sat_path = str(out_dir / "satellite.jpg")
     nir_path = str(out_dir / "nir.tif") if (out_dir / "nir.tif").exists() else None
     in_channels = 4 if nir_path else 3
@@ -53,7 +60,7 @@ def run_pipeline(
 
     yield from emit("segmenting", 10)
     mask = predict_mask(model, sat_path, device, nir_path=nir_path, in_channels=in_channels)
-    mask_path = str(out_dir / "road_mask.png")
+    mask_path = str(run_dir / "road_mask.png")
     import cv2
     cv2.imwrite(mask_path, mask)
 
@@ -86,14 +93,14 @@ def run_pipeline(
     bc = compute_betweenness(G_healed)
     ablation = ablation_curve(G_healed, bc, max_removals=10)
 
-    graph_path = str(out_dir / "healed_graph.gpickle")
+    graph_path = str(run_dir / "healed_graph.gpickle")
     with open(graph_path, "wb") as f:
         pickle.dump(G_healed, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     yield from emit("zones", 75)
     zones = classify_zones(G_healed, bc)
     geojson = zones_to_geojson(G_healed, zones, bc)
-    geojson_path = out_dir / "zones.geojson"
+    geojson_path = run_dir / "zones.geojson"
     with open(geojson_path, "w") as f:
         json.dump(geojson, f)
 
@@ -132,12 +139,34 @@ def run_pipeline(
         "ablation": ablation,
     }
 
-    with open(summary_path, "w") as f:
+    with open(run_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
 
-    log_path = out_dir / "pipeline_log.jsonl"
-    with open(log_path, "w") as f:
+    with open(run_dir / "pipeline_log.jsonl", "w") as f:
         for ev in log:
             f.write(json.dumps(ev) + "\n")
 
-    yield from emit("done", 100, summary=summary)
+    # Promote staged artifacts into out_dir only on success. A degenerate graph
+    # (fewer than min_nodes) is rejected when a known-good run already exists, so
+    # a domain/resolution-mismatched model cannot destroy good outputs. The
+    # rejected run is left in run_dir for inspection.
+    import shutil
+    artifacts = ["road_mask.png", "healed_graph.gpickle", "zones.geojson",
+                 "summary.json", "pipeline_log.jsonl"]
+    had_previous = summary_path.exists()
+    degenerate = summary["n_nodes"] < min_nodes
+
+    if had_previous and degenerate:
+        yield from emit("done", 100, summary=summary, promoted=False,
+                        warning=(f"kept previous outputs: run found only "
+                                 f"{summary['n_nodes']} nodes (< {min_nodes}); "
+                                 f"staged in {run_dir.name}"))
+        return
+
+    for name in artifacts:
+        src = run_dir / name
+        if src.exists():
+            shutil.move(str(src), str(out_dir / name))
+    shutil.rmtree(run_dir, ignore_errors=True)
+
+    yield from emit("done", 100, summary=summary, promoted=True)

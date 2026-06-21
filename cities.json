@@ -43,5 +43,87 @@
     "center": [13.0827, 80.2707],
     "zoom": 13,
     "flood_threshold_m": 10.0
+  },
+
+  "rural_punjab": {
+    "name": "Rural Punjab (Ludhiana belt)",
+    "terrain": "rural",
+    "bbox": [30.70, 75.65, 30.95, 75.95],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [30.8245, 75.8000],
+    "zoom": 12,
+    "flood_threshold_m": 245.0
+  },
+  "rural_bihar": {
+    "name": "Rural Bihar (Gangetic plain)",
+    "terrain": "rural",
+    "bbox": [25.55, 85.00, 25.80, 85.30],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [25.6750, 85.1500],
+    "zoom": 12,
+    "flood_threshold_m": 50.0
+  },
+  "rural_mp": {
+    "name": "Rural Madhya Pradesh (Malwa)",
+    "terrain": "rural",
+    "bbox": [23.00, 76.50, 23.25, 76.80],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [23.1250, 76.6500],
+    "zoom": 12,
+    "flood_threshold_m": 470.0
+  },
+  "rural_maharashtra": {
+    "name": "Rural Maharashtra (Vidarbha)",
+    "terrain": "rural",
+    "bbox": [20.80, 78.50, 21.05, 78.80],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [20.9250, 78.6500],
+    "zoom": 12,
+    "flood_threshold_m": 290.0
+  },
+
+  "terrain_himalaya": {
+    "name": "Himalayan hilly (Shimla region)",
+    "terrain": "mountain",
+    "bbox": [31.00, 77.05, 31.20, 77.30],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [31.1048, 77.1734],
+    "zoom": 12,
+    "flood_threshold_m": 2100.0
+  },
+  "terrain_thar": {
+    "name": "Thar desert (Jaisalmer)",
+    "terrain": "desert",
+    "bbox": [26.80, 70.80, 27.05, 71.10],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [26.9157, 70.9083],
+    "zoom": 12,
+    "flood_threshold_m": 225.0
+  },
+  "terrain_konkan": {
+    "name": "Konkan coastal (Ratnagiri)",
+    "terrain": "coastal",
+    "bbox": [16.90, 73.25, 17.10, 73.45],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [16.9902, 73.3120],
+    "zoom": 12,
+    "flood_threshold_m": 8.0
+  },
+  "terrain_ne_forest": {
+    "name": "NE forest (Shillong/Meghalaya)",
+    "terrain": "forest",
+    "bbox": [25.50, 91.80, 25.70, 92.05],
+    "pixel_m": 10.0,
+    "dem_source": "srtm",
+    "center": [25.5788, 91.8933],
+    "zoom": 12,
+    "flood_threshold_m": 1450.0
   }
 }

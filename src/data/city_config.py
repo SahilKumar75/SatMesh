@@ -16,6 +16,7 @@ class CityConfig:
     center: List[float]
     zoom: int
     flood_threshold_m: float
+    terrain: str = "urban"
 
 
 def load_all() -> dict:

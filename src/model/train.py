@@ -75,12 +75,31 @@ class CanopyOcclusionOnRoad:
         return out
 
 
+def _clahe_gamma(img_rgb, gamma=1.2, clip=2.0, tile=8):
+    """Deterministic CLAHE + gamma enhancement for 10 m Sentinel-2 tiles.
+
+    Roads are 1-2 px wide at 10 m; CLAHE on the LAB L-channel lifts local
+    contrast and the gamma LUT brightens shadowed stretches. Matches the
+    enhancement the India Sentinel-2 Roads Dataset ships with. Operates on
+    uint8 RGB so it works for both the 3-ch and 4-ch (RGB+NIR) paths.
+    """
+    lab = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2LAB)
+    clahe = cv2.createCLAHE(clipLimit=clip, tileGridSize=(tile, tile))
+    lab[..., 0] = clahe.apply(lab[..., 0])
+    out = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    lut = np.array([((i / 255.0) ** (1.0 / gamma)) * 255 for i in range(256)],
+                   dtype=np.uint8)
+    return cv2.LUT(out, lut)
+
+
 class RoadDS(Dataset):
-    def __init__(self, data_dir, img_size=512, use_nir=False, subset=None, augment=True):
+    def __init__(self, data_dir, img_size=512, use_nir=False, subset=None, augment=True,
+                 use_clahe=False):
         self.data_dir = Path(data_dir)
         self.img_size = img_size
         self.use_nir = use_nir
         self.augment = augment
+        self.use_clahe = use_clahe
         self.canopy_aug = CanopyOcclusionOnRoad()
 
         sat_files = sorted(self.data_dir.glob("*_sat.jpg"))
@@ -136,6 +155,9 @@ class RoadDS(Dataset):
             raise FileNotFoundError(sat_path)
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
+        if self.use_clahe:
+            img_rgb = _clahe_gamma(img_rgb)
+
         mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
         if mask is None:
             raise FileNotFoundError(mask_path)
@@ -176,6 +198,7 @@ def _make_loader(cfg, augment):
         use_nir=cfg["use_nir"],
         subset=cfg.get("subset"),
         augment=augment,
+        use_clahe=cfg.get("use_clahe", False),
     )
     return DataLoader(
         ds,
@@ -288,12 +311,16 @@ def run_stage(config, stage):
         except AttributeError:
             pass
 
-    n = len(RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"), augment=False))
+    use_clahe = cfg.get("use_clahe", False)
+    n = len(RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"),
+                   augment=False, use_clahe=use_clahe))
     split = max(1, int(n * 0.1))
     train_size = n - split
 
-    full_ds = RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"), augment=True)
-    val_ds = RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"), augment=False)
+    full_ds = RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"),
+                     augment=True, use_clahe=use_clahe)
+    val_ds = RoadDS(cfg["data_dir"], cfg["img_size"], cfg["use_nir"], cfg.get("subset"),
+                    augment=False, use_clahe=use_clahe)
 
     from torch.utils.data import Subset
     indices = list(range(len(full_ds)))
