@@ -153,7 +153,7 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
     model = load_model(args.checkpoint, device, args.model, in_channels=args.in_channels,
                        encoder_name=args.encoder)
 

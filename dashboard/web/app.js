@@ -249,9 +249,9 @@ function setLayerMode(mode) {
   if (mode === 'satellite') ensureSatLayer();
 
   const show = (id, v) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none'); };
-  show('edges-layer',      mode === 'graph');
+  show('edges-layer',      mode === 'graph' || mode === 'satellite');
   show('edges-heatmap',    mode === 'heatmap');
-  show('nodes-layer',      mode === 'graph' || mode === 'heatmap');
+  show('nodes-layer',      mode === 'graph' || mode === 'heatmap' || mode === 'satellite');
   show('road-mask-layer',  mode === 'mask');
   show('sat-layer',        mode === 'satellite');
   show('osm-dark',         mode !== 'satellite');

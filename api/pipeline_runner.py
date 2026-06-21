@@ -6,7 +6,7 @@ from pathlib import Path
 _running: dict[str, bool] = {}
 
 
-def start_pipeline(city_id: str, checkpoint: str):
+def start_pipeline(city_id: str, checkpoint: str, encoder_name: str = "mit_b4"):
     import sys
     sys.path.insert(0, ".")
     from src.pipeline import run_pipeline
@@ -17,7 +17,7 @@ def start_pipeline(city_id: str, checkpoint: str):
     running_flag.touch()
 
     try:
-        for event in run_pipeline(city_id, checkpoint):
+        for event in run_pipeline(city_id, checkpoint, encoder_name=encoder_name):
             yield f"data: {json.dumps(event)}\n\n"
     finally:
         if running_flag.exists():

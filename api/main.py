@@ -79,10 +79,12 @@ def city_mask(city_id: str):
 
 
 @app.post("/cities/{city_id}/run")
-def run_pipeline(city_id: str, checkpoint: str = "checkpoints/dlinknet_india.pth", mock: bool = False):
+def run_pipeline(city_id: str, checkpoint: str = "checkpoints/segformer_india_v2.pth",
+                 encoder: str = "mit_b4", mock: bool = False):
     if mock:
         return StreamingResponse(stream_mock(city_id), media_type="text/event-stream")
-    return StreamingResponse(start_pipeline(city_id, checkpoint), media_type="text/event-stream")
+    return StreamingResponse(start_pipeline(city_id, checkpoint, encoder_name=encoder),
+                             media_type="text/event-stream")
 
 
 @app.post("/cities/{city_id}/reroute")

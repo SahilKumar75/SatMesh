@@ -13,6 +13,7 @@ def run_pipeline(
     cities_path: str = "cities.json",
     force_rerun: bool = False,
     model_type: str = "segformer",
+    encoder_name: str = "mit_b4",
 ) -> Generator[dict, None, None]:
     import torch
     from src.data.city_config import load_city
@@ -34,7 +35,7 @@ def run_pipeline(
             yield {"step": "done", "pct": 100, "cached": True, "summary": json.load(f)}
         return
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
     log = []
 
     def emit(step, pct, **extra):
@@ -42,13 +43,16 @@ def run_pipeline(
         log.append(ev)
         yield ev
 
-    yield from emit("loading_model", 0)
-    model = load_model(checkpoint, device, model_type=model_type, in_channels=4)
-
-    yield from emit("segmenting", 10)
     sat_path = str(out_dir / "satellite.jpg")
     nir_path = str(out_dir / "nir.tif") if (out_dir / "nir.tif").exists() else None
-    mask = predict_mask(model, sat_path, device, nir_path=nir_path)
+    in_channels = 4 if nir_path else 3
+
+    yield from emit("loading_model", 0)
+    model = load_model(checkpoint, device, model_type=model_type,
+                       in_channels=in_channels, encoder_name=encoder_name)
+
+    yield from emit("segmenting", 10)
+    mask = predict_mask(model, sat_path, device, nir_path=nir_path, in_channels=in_channels)
     mask_path = str(out_dir / "road_mask.png")
     import cv2
     cv2.imwrite(mask_path, mask)
