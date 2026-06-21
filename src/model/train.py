@@ -276,8 +276,16 @@ def run_stage(config, stage):
 
     if stage == "stage2" and "checkpoint_in" in cfg and os.path.exists(cfg["checkpoint_in"]):
         if model_type == "segformer":
-            model = build_segformer_4ch(cfg["checkpoint_in"], device=str(device),
+            if cfg["use_nir"]:
+                # 4-ch: expand the 3-ch base's patch_embed1 with a synthetic NIR channel
+                model = build_segformer_4ch(cfg["checkpoint_in"], device=str(device),
+                                            encoder_name=encoder_name)
+            else:
+                # 3-ch RGB resume (e.g. high-res Esri fine-tune of v2) — load weights as-is
+                model = build_segformer(pretrained=False, in_channels=3,
                                         encoder_name=encoder_name)
+                state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)
+                model.load_state_dict(state)
         else:
             model = build_dlinknet(pretrained=False, in_channels=in_channels)
             state = torch.load(cfg["checkpoint_in"], map_location=device, weights_only=True)

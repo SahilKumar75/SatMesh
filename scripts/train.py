@@ -73,6 +73,9 @@ def main():
                     help="enable gradient checkpointing (required for B3/B4 on 16GB GPU)")
     ap.add_argument("--clahe", action="store_true",
                     help="CLAHE+gamma enhance inputs (recommended for 10m Sentinel-2 stage-2)")
+    ap.add_argument("--no-nir", action="store_true",
+                    help="stage-2 trains 3-ch RGB (high-res Esri tiles, resumes 3-ch v2); "
+                         "default uses 4-ch synth-NIR for 10m Sentinel-2")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -96,7 +99,8 @@ def main():
                    "checkpoint_out": f"{args.out}/stage1.pth"},
         "stage2": {"data_dir": args.india_dir or "data/sentinel2_india/train",
                    "epochs": args.epochs2, "batch": args.batch2, "lr": 5e-5,
-                   "img_size": args.img_size, "subset": args.subset, "use_nir": True,
+                   "img_size": args.img_size, "subset": args.subset,
+                   "use_nir": not args.no_nir,
                    "model": args.model,
                    "encoder_name": args.encoder,
                    "grad_checkpoint": args.grad_checkpoint,
