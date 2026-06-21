@@ -3,133 +3,228 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SatMesh — Urban Road Resilience · ISRO BAH 2026</title>
-  <meta name="description" content="SatMesh: occlusion-robust road extraction + graph-theoretic resilience simulator for Indian cities. ISRO BAH 2026 PS4." />
-  <meta name="theme-color" content="#0a0c10" />
-
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='30' cy='30' r='13' fill='%2322c55e'/><circle cx='72' cy='26' r='13' fill='%23f97316'/><circle cx='50' cy='72' r='13' fill='%23ef4444'/><line x1='30' y1='30' x2='72' y2='26' stroke='%23475569' stroke-width='7'/><line x1='30' y1='30' x2='50' y2='72' stroke='%23475569' stroke-width='7'/><line x1='72' y1='26' x2='50' y2='72' stroke='%23475569' stroke-width='7'/></svg>" />
-
+  <title>SatMesh · Urban Road Resilience · ISRO BAH 2026</title>
+  <meta name="theme-color" content="#08090a" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><rect x='0' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><circle cx='17' cy='17' r='2.2' fill='%23c45a5a'/></svg>" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- ===== Full-viewport WebGL map ===== -->
-  <div id="map" aria-label="Road network map — click intersections to disable them"></div>
+  <!-- ══ TOP BAR ══════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="tb-brand">
+      <svg class="tb-logo" width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="0"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="5"  y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="10" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="15" y="0"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="0"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="5"  y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="10" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="15" y="5"  width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="0"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="5"  y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="10" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="15" y="10" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="0"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="5"  y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <rect x="10" y="15" width="4" height="4" rx="0.6" fill="#5a7d8a"/>
+        <circle cx="17" cy="17" r="2.2" fill="#c45a5a"/>
+      </svg>
+      <span class="tb-name">SatMesh</span>
+      <span class="tb-badge">ISRO BAH 2026 · PS4</span>
+    </div>
 
-  <!-- ===== Left floating panel ===== -->
-  <aside class="panel left" id="left-panel">
-    <header class="brand">
-      <span class="glyph" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="5" cy="6" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="12" cy="13" r="2.4"/>
-          <circle cx="6" cy="19" r="2"/><circle cx="18" cy="18" r="2"/>
-          <path d="M6.6 7.3 10 11.4M17.4 6.3 13.6 11.2M11 14.6 7.4 17.6M13.3 14.4 16.6 16.7" stroke-linecap="round"/>
-        </svg>
-      </span>
-      <div class="brand-txt">
-        <div class="brand-name">SatMesh</div>
-        <div class="brand-sub">Urban Road Resilience · ISRO BAH 2026 PS4</div>
+    <div class="tb-controls">
+      <div class="ctrl-group">
+        <label class="ctrl-lbl" for="city-select">City</label>
+        <select id="city-select" class="city-sel"></select>
       </div>
-      <span class="status"><i class="status-dot" id="status-dot"></i></span>
-    </header>
+      <label class="live-wrap" title="Live = run model on GPU. Off = replay pre-computed log.">
+        <input type="checkbox" id="live-toggle" class="live-chk" />
+        <span class="live-track"><span class="live-thumb"></span></span>
+        <span class="live-lbl">Live GPU</span>
+      </label>
+      <button id="run-btn" class="run-btn">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Run Pipeline
+      </button>
+    </div>
 
-    <!-- City + run -->
-    <div class="block">
-      <label class="lbl" for="city-select">City</label>
-      <select id="city-select" class="select"></select>
-
-      <div class="run-row">
-        <button id="run-btn" class="btn primary">Run Pipeline</button>
-        <label class="switch" title="Live = run model on GPU. Off = replay pre-computed log.">
-          <input type="checkbox" id="live-toggle" />
-          <span>Live</span>
-        </label>
+    <div class="tb-tele">
+      <div class="src-tags">
+        <span class="src-tag">Sentinel-2 · 10m</span>
+        <span class="src-tag">OSM Ground Truth</span>
       </div>
-
-      <div class="progress-bar" style="display:none">
-        <div class="progress-fill" id="progress-fill"></div>
-        <span class="progress-label" id="progress-label"></span>
+      <div class="tele-dot-wrap">
+        <span class="status-dot" id="status-dot"></span>
+        <span class="status-lbl" id="status-lbl">OFFLINE</span>
       </div>
-
-      <div class="status-line" id="status-text">Select a city, then Run Pipeline.</div>
+      <time class="tele-clock" id="tele-clock">--:--:-- UTC</time>
     </div>
+  </header>
 
-    <!-- Zone legend -->
-    <div class="block">
-      <div class="lbl">Resilience Zones</div>
-      <ul class="legend" id="zone-legend">
-        <li><i class="sw" style="background:#ef4444"></i> Critical <span class="ct" id="z-critical">—</span></li>
-        <li><i class="sw" style="background:#f97316"></i> Vulnerable <span class="ct" id="z-vulnerable">—</span></li>
-        <li><i class="sw" style="background:#22c55e"></i> Resilient <span class="ct" id="z-resilient">—</span></li>
-        <li><i class="sw ring"></i> Flood-critical <span class="ct" id="z-flood">—</span></li>
-      </ul>
-    </div>
+  <!-- ══ LAYOUT ════════════════════════════════════════════════ -->
+  <div class="layout">
 
-    <!-- APLS hero + metric cards -->
-    <div class="block">
-      <div class="lbl">Track B Metrics</div>
-      <div class="apls-hero">
-        <div class="apls-val" id="m-apls">—</div>
-        <div class="apls-cap">APLS<br/><span>topology vs OSM</span></div>
+    <!-- ── LEFT SIDEBAR ── -->
+    <aside class="sidebar sidebar-l" aria-label="Network metrics and status">
+
+      <!-- Pipeline progress (hidden when idle) -->
+      <section class="pane" id="pipeline-pane" style="display:none">
+        <div class="pane-hdr">Pipeline</div>
+        <div class="ps-grid" id="pipeline-steps"></div>
+        <div class="prog-track"><div class="prog-fill" id="progress-fill"></div></div>
+        <div class="prog-step" id="progress-label">—</div>
+      </section>
+
+      <!-- Track A: Segmentation quality -->
+      <section class="pane">
+        <div class="pane-hdr">Track A &mdash; Segmentation</div>
+        <div class="stat3">
+          <div class="stat-cell">
+            <div class="stat-val" id="m-iou">—</div>
+            <div class="stat-key">IoU</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val" id="m-dice">—</div>
+            <div class="stat-key">Dice</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val" id="m-occ-recall">—</div>
+            <div class="stat-key">Occ. Recall</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Track B: Graph topology -->
+      <section class="pane">
+        <div class="pane-hdr">Track B &mdash; Graph Topology</div>
+        <div class="hero-row">
+          <div class="hero-val" id="m-apls">—</div>
+          <div class="hero-meta">
+            <div class="hero-label">APLS</div>
+            <div class="hero-sub">Average Path Length Score vs OSM</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="kv-list">
+          <div class="kv"><span class="kv-k">Connectivity ratio</span><span class="kv-v" id="m-connectivity">—</span></div>
+          <div class="kv"><span class="kv-k">Resilience R<sub>3</sub></span><span class="kv-v" id="m-resilience">—</span></div>
+          <div class="kv"><span class="kv-k">Resilience R<sub>5</sub></span><span class="kv-v" id="m-resilience5">—</span></div>
+          <div class="kv"><span class="kv-k">Nodes</span><span class="kv-v" id="m-nodes">—</span></div>
+          <div class="kv"><span class="kv-k">Healed edges</span><span class="kv-v" id="m-synthetic">—</span></div>
+          <div class="kv"><span class="kv-k">Gatekeepers</span><span class="kv-v" id="m-gatekeepers">—</span></div>
+          <div class="kv"><span class="kv-k">Flood-critical</span><span class="kv-v" id="m-floodcrit">—</span></div>
+        </div>
+      </section>
+
+      <!-- Criticality zones -->
+      <section class="pane">
+        <div class="pane-hdr">Criticality Legend</div>
+        <ul class="zone-list">
+          <li class="zone-row">
+            <span class="zone-chip z-critical">CRITICAL</span>
+            <span class="zone-cnt" id="z-critical">—</span>
+            <span class="zone-desc">High betweenness · single-point failure</span>
+          </li>
+          <li class="zone-row">
+            <span class="zone-chip z-warn">VULNERABLE</span>
+            <span class="zone-cnt" id="z-vulnerable">—</span>
+            <span class="zone-desc">Elevated centrality</span>
+          </li>
+          <li class="zone-row">
+            <span class="zone-chip z-ok">RESILIENT</span>
+            <span class="zone-cnt" id="z-resilient">—</span>
+            <span class="zone-desc">Redundant path coverage</span>
+          </li>
+          <li class="zone-row">
+            <span class="zone-chip z-flood">FLOOD-RISK</span>
+            <span class="zone-cnt" id="z-flood">—</span>
+            <span class="zone-desc">Below DEM elevation threshold</span>
+          </li>
+          <li class="zone-row">
+            <span class="zone-chip z-synth">HEALED</span>
+            <span class="zone-cnt"></span>
+            <span class="zone-desc">MST-inferred synthetic edge</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Status log -->
+      <section class="pane pane-log">
+        <div class="pane-hdr">Status</div>
+        <div class="log-line" id="status-text">Select a city and run the pipeline to begin.</div>
+      </section>
+
+    </aside>
+
+    <!-- ── MAP ── -->
+    <div class="map-wrap">
+      <div id="map" aria-label="Road network map — click nodes to simulate failure"></div>
+      <div class="layer-switcher" role="group" aria-label="Map layer">
+        <button class="layer-btn active" data-mode="graph">Graph</button>
+        <button class="layer-btn" data-mode="mask">Mask</button>
+        <button class="layer-btn" data-mode="satellite">Satellite</button>
       </div>
-      <div class="cards">
-        <div class="card"><div class="cv" id="m-connectivity">—</div><div class="ck">Connectivity</div></div>
-        <div class="card"><div class="cv" id="m-resilience">—</div><div class="ck">Resilience idx</div></div>
-        <div class="card"><div class="cv" id="m-gatekeepers">—</div><div class="ck">Gatekeepers</div></div>
-        <div class="card"><div class="cv" id="m-floodcrit">—</div><div class="ck">Flood-critical</div></div>
-        <div class="card"><div class="cv" id="m-nodes">—</div><div class="ck">Nodes</div></div>
-        <div class="card"><div class="cv" id="m-synthetic">—</div><div class="ck">Healed edges</div></div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- ===== Right floating panel ===== -->
-  <aside class="panel right" id="right-panel">
-    <div class="block">
-      <div class="lbl">Resilience Under Attack <span class="pill">ABLATION</span></div>
-      <div class="chart-wrap"><canvas id="ablation-chart" role="img" aria-label="Resilience index and connected fraction vs nodes removed"></canvas></div>
-      <div class="chart-legend">
-        <span><i class="sw" style="background:#22c55e"></i> Resilience index</span>
-        <span><i class="sw" style="background:#f97316"></i> Connected fraction</span>
-      </div>
-    </div>
-    <div class="block grow">
-      <div class="lbl">Top Gatekeepers <span class="pill">BETWEENNESS</span></div>
-      <div class="gk-list" id="gk-list" role="list"></div>
-    </div>
-  </aside>
-
-  <!-- ===== Bottom toolbar ===== -->
-  <div class="toolbar" role="toolbar" aria-label="Map and scenario controls">
-    <!-- Three-state layer toggle -->
-    <div class="tb-group layer-toggle" role="group" aria-label="Map layer">
-      <button class="layer-btn" data-mode="satellite">Satellite</button>
-      <button class="layer-btn" data-mode="mask">Road Mask</button>
-      <button class="layer-btn active" data-mode="graph">Graph</button>
     </div>
 
-    <!-- Disaster scenarios -->
-    <div class="tb-group">
-      <span class="tb-lbl">Disaster</span>
-      <button class="btn sm" id="sc-flood">Flood</button>
-      <input type="number" id="sc-flood-thr" class="num" value="900" title="Elevation threshold (m)" />
-      <button class="btn sm" id="sc-quake">Earthquake</button>
-      <button class="btn sm danger" id="sc-collapse">Collapse Top 3</button>
-      <button class="btn sm ghost" id="sc-reset">Reset</button>
-    </div>
+    <!-- ── RIGHT SIDEBAR ── -->
+    <aside class="sidebar sidebar-r" aria-label="Analysis and simulation">
 
-    <!-- Reroute -->
-    <div class="tb-group">
-      <span class="tb-lbl">Route</span>
-      <select id="sel-from" class="sel sm" aria-label="From node"></select>
-      <span aria-hidden="true">→</span>
-      <select id="sel-to" class="sel sm" aria-label="To node"></select>
-      <button class="btn sm accent" id="btn-route">Compute</button>
-    </div>
+      <!-- Ablation chart -->
+      <section class="pane pane-fixed">
+        <div class="pane-hdr">Resilience Under Attack <span class="tag">Ablation</span></div>
+        <div class="chart-wrap"><canvas id="ablation-chart" role="img" aria-label="Resilience index and connected fraction vs nodes removed"></canvas></div>
+        <div class="chart-leg">
+          <span class="cl"><i class="cl-line cl-ok"></i>Resilience index</span>
+          <span class="cl"><i class="cl-line cl-warn"></i>Connected fraction</span>
+        </div>
+      </section>
+
+      <!-- Gatekeeper list -->
+      <section class="pane pane-grow">
+        <div class="pane-hdr">Top Gatekeepers <span class="tag">Betweenness</span></div>
+        <div class="gk-list" id="gk-list" role="list"></div>
+      </section>
+
+      <!-- Stress-test scenarios -->
+      <section class="pane pane-fixed">
+        <div class="pane-hdr">Stress-Test Scenarios</div>
+        <div class="sc-list">
+          <div class="sc-row">
+            <button class="sc-btn sc-flood" id="sc-flood">Flood Simulation</button>
+            <div class="sc-param">
+              <label class="sc-param-lbl">Elev ≤</label>
+              <input type="number" id="sc-flood-thr" class="sc-num" value="900" />
+              <span class="sc-unit">m</span>
+            </div>
+          </div>
+          <button class="sc-btn sc-quake" id="sc-quake">Seismic Event <span class="sc-sub">1.5 km radius</span></button>
+          <button class="sc-btn sc-danger" id="sc-collapse">Collapse Top 3 Gatekeepers</button>
+          <button class="sc-reset" id="sc-reset">↺ Restore Network</button>
+        </div>
+      </section>
+
+      <!-- Route finder -->
+      <section class="pane pane-fixed">
+        <div class="pane-hdr">Rerouting Simulator</div>
+        <div class="route-inputs">
+          <select id="sel-from" class="route-sel" aria-label="From node"></select>
+          <span class="route-arr" aria-hidden="true">→</span>
+          <select id="sel-to" class="route-sel" aria-label="To node"></select>
+        </div>
+        <button class="route-btn" id="btn-route">Compute Optimal Route</button>
+      </section>
+
+    </aside>
   </div>
 
-  <!-- Scenario result toast -->
+  <!-- Toast notification -->
   <div class="toast" id="scenario-toast" role="status" aria-live="polite"></div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
