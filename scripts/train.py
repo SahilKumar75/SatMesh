@@ -76,8 +76,15 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-    dg = find_deepglobe(args.deepglobe)
-    print("DeepGlobe:", dg, "|", len(glob.glob(f"{dg}/*_sat.jpg")), "tiles")
+    # Only resolve DeepGlobe when stage-1 will run. With --skip-stage1 the
+    # auto-download (kagglehub) must not fire — it needs internet, which is off
+    # on Kaggle kernels and would crash the india-only fine-tune path.
+    if args.skip_stage1:
+        dg = args.deepglobe or ""
+        print("Stage-1 skipped — not resolving DeepGlobe")
+    else:
+        dg = find_deepglobe(args.deepglobe)
+        print("DeepGlobe:", dg, "|", len(glob.glob(f"{dg}/*_sat.jpg")), "tiles")
 
     cfg = {
         "stage1": {"data_dir": dg, "epochs": args.epochs, "batch": args.batch,
