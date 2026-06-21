@@ -154,6 +154,35 @@ def _copy_as(src, dst):
     cv2.imwrite(str(dst), img)
 
 
+def ingest_paired(images_dir, masks_dir, out_dir):
+    """Pair an images folder with a masks folder by identical file stem.
+
+    Fits the Zenodo India S2 layout (zenodo.15765738): separate folders where
+    image ``N.png`` matches mask ``N.png``. Use the plain (non-enhanced) images
+    folder so the model's own CLAHE step isn't double-applied.
+    """
+    img_dir, msk_dir = Path(images_dir).expanduser(), Path(masks_dir).expanduser()
+    if not img_dir.exists() or not msk_dir.exists():
+        print(f"[paired] missing {img_dir} or {msk_dir} — skipping")
+        return 0
+
+    exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+    masks = {p.stem: p for p in msk_dir.rglob("*") if p.suffix.lower() in exts}
+    written = 0
+    for p in img_dir.rglob("*"):
+        if p.suffix.lower() not in exts:
+            continue
+        mpath = masks.get(p.stem)
+        if mpath is None:
+            continue
+        stem = f"pub_{p.stem}"
+        _copy_as(p, out_dir / f"{stem}_sat.jpg")
+        _copy_as(mpath, out_dir / f"{stem}_mask.png")
+        written += 1
+    print(f"[paired] ingested {written} pairs ({img_dir.name} + {msk_dir.name})")
+    return written
+
+
 def build_region(city_id, cfg, out_dir, tile, min_road_frac):
     """Download Sentinel-2 RGB + rasterize OSM roads for one region, then tile."""
     from src.data import sentinel_dl, mask_raster
@@ -195,7 +224,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--published-dir", default=None,
-                    help="folder of the downloaded India Sentinel-2 Roads Dataset")
+                    help="folder of a token-named published dataset (mask/label in names)")
+    ap.add_argument("--images-dir", default=None,
+                    help="Zenodo-style images folder (paired by stem with --masks-dir)")
+    ap.add_argument("--masks-dir", default=None,
+                    help="Zenodo-style masks folder (paired by stem with --images-dir)")
     ap.add_argument("--regions", default="all",
                     help="'all' (default), 'none', or comma-separated cities.json ids")
     ap.add_argument("--out", default="data/sentinel2_india/train",
@@ -211,6 +244,8 @@ def main():
     total = 0
     if args.published_dir:
         total += ingest_published(args.published_dir, out_dir)
+    if args.images_dir and args.masks_dir:
+        total += ingest_paired(args.images_dir, args.masks_dir, out_dir)
 
     regions = resolve_regions(args.regions)
     for cid, cfg in regions.items():

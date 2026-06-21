@@ -32,10 +32,12 @@ ROOT = "/kaggle/working/SatMesh"
 # highres (Checkpoint B): DeepGlobe Kaggle dataset
 DEEPGLOBE = "/kaggle/input/deepglobe-road-extraction-dataset/train"
 
-# india (Checkpoint A): published India S2 Roads Dataset + a stage-1 base ckpt.
-# Upload both as Kaggle datasets and fix these paths to match.
-INDIA_DS    = "/kaggle/input/india-sentinel2-roads"          # the 5634-tile dataset folder
-STAGE1_CKPT = "/kaggle/input/satmesh-stage1/segformer_india_v2.pth"  # resume base (= high-res ckpt)
+# india (Checkpoint A): Zenodo India S2 Roads Dataset (zenodo.15765738, CC-BY 4.0)
+# + a stage-1 base ckpt. Upload both as Kaggle datasets and fix these paths.
+# Use the PLAIN images folder (not images_enhanced_*) — paired by stem with masks.
+INDIA_IMAGES = "/kaggle/input/india-sentinel2-roads/images_png"   # plain Sentinel-2 PNGs (1.png ...)
+INDIA_MASKS  = "/kaggle/input/india-sentinel2-roads/masks_png"    # binary road masks (1.png ...)
+STAGE1_CKPT  = "/kaggle/input/satmesh-stage1/segformer_india_v2.pth"  # resume base (= high-res ckpt)
 
 OUT_DIR = "/kaggle/working"
 # ──────────────────────────────────────────────────────────────────────────────
@@ -78,24 +80,26 @@ if MODE == "highres":
     final = os.path.join(OUT_DIR, "segformer_highres_v3.pth")
 
 elif MODE == "india":
-    print("Checkpoint A — Sentinel-2 10 m India fine-tune (with CLAHE)")
-    # 4a. Ingest the pre-uploaded India dataset (no network needed).
+    print(f"Checkpoint A — Sentinel-2 10 m India fine-tune ({'PoC' if POC else 'full'})")
+    # 4a. Ingest the pre-uploaded Zenodo dataset (paired by stem, no network).
     run([sys.executable, "scripts/prepare_india_dataset.py",
-         "--published-dir", INDIA_DS, "--regions", "none",
-         "--out", "data/sentinel2_india/train", "--tile", "512"])
+         "--images-dir", INDIA_IMAGES, "--masks-dir", INDIA_MASKS,
+         "--regions", "none", "--out", "data/sentinel2_india/train"])
     # 4b. Stage-2 resumes from {out}/stage1.pth — seed it with the high-res base.
     os.makedirs("checkpoints/b4_india", exist_ok=True)
     shutil.copy(STAGE1_CKPT, "checkpoints/b4_india/stage1.pth")
     # 4c. Fine-tune (stage-2 only). T4-sized batch.
-    img   = "384" if POC else "512"
-    eps   = "12"  if POC else "35"
+    img = "384" if POC else "512"
+    eps = "12"  if POC else "35"
     cmd = [sys.executable, "scripts/train.py", "--skip-stage1",
            "--india-dir", "data/sentinel2_india/train",
            "--encoder", "mit_b4", "--model", "segformer",
-           "--img-size", img, "--batch2", "8", "--epochs2", eps, "--clahe",
+           "--img-size", img, "--batch2", "8", "--epochs2", eps,
            "--out", "checkpoints/b4_india"]
     if POC:
         cmd += ["--subset", "1500"]   # cap tiles for a ~30min PoC
+    else:
+        cmd += ["--clahe"]   # full run only; live inference must add CLAHE too
     run(cmd)
     produced = "checkpoints/b4_india/segformer_india.pth"
     final = os.path.join(OUT_DIR, "segformer_india_s2.pth")
