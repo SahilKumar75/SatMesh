@@ -110,7 +110,10 @@ def run_pipeline(
         import osmnx as ox
         import networkx as nx
         south, west, north, east = cfg.bbox[0], cfg.bbox[1], cfg.bbox[2], cfg.bbox[3]
-        G_osm = ox.graph_from_bbox(north, south, east, west, network_type="drive")
+        try:
+            G_osm = ox.graph_from_bbox(bbox=(west, south, east, north), network_type="drive")
+        except TypeError:
+            G_osm = ox.graph_from_bbox(north, south, east, west, network_type="drive")
         G_osm_u = nx.Graph(G_osm)
         apls_score = compute_apls(G_healed, G_osm_u, n_samples=200)
     except Exception:

@@ -6,7 +6,12 @@ from pathlib import Path
 def fetch_osm_roads(bbox, network_type="drive"):
     import osmnx as ox
     south, west, north, east = bbox
-    G = ox.graph_from_bbox(north, south, east, west, network_type=network_type)
+    try:
+        # osmnx >= 2.0: single bbox tuple (left, bottom, right, top)
+        G = ox.graph_from_bbox(bbox=(west, south, east, north), network_type=network_type)
+    except TypeError:
+        # osmnx < 2.0: positional (north, south, east, west)
+        G = ox.graph_from_bbox(north, south, east, west, network_type=network_type)
     return ox.graph_to_gdfs(G, nodes=False)["geometry"]
 
 
