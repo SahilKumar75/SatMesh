@@ -29,7 +29,7 @@ def skeleton_recall_loss(pred_logits, target, iters=5):
     return 1.0 - recall
 
 
-def soft_cldice_loss(pred_logits, target, iters=10, smooth=1e-5):
+def soft_cldice_loss(pred_logits, target, iters=6, smooth=1e-5):
     """Soft clDice — topology-preserving connectivity loss (Shit et al., CVPR 2021,
     arxiv 2003.07311). Bidirectional: Tprec (pred skeleton inside GT) penalises
     hallucinated roads, Tsens (GT skeleton inside pred) penalises broken roads.
