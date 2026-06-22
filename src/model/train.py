@@ -48,10 +48,21 @@ DEFAULT_CONFIG = {
 
 
 class CanopyOcclusionOnRoad:
-    def __init__(self, num_blobs=(4, 20), blob_r=(10, 50), p=0.5):
+    """Simulate occlusions over roads so the model learns to infer through them.
+
+    Two occlusion types — green tree canopy and dark building/cloud shadow — drawn
+    over road pixels. Blob sizes span a wide range (small to large) so the model
+    sees gaps of varying length: the Chesapeake-RSC "Seeing Roads Through Trees"
+    study shows occluded-road recall falls as gap distance grows, so varied gaps
+    are what train robustness. Shadows blend (darken) rather than paint a flat
+    colour, matching real shadow appearance.
+    """
+
+    def __init__(self, num_blobs=(3, 18), blob_r=(8, 95), p=0.6, shadow_p=0.5):
         self.num_blobs = num_blobs
-        self.blob_r = blob_r
+        self.blob_r = blob_r          # wide range -> varied gap sizes
         self.p = p
+        self.shadow_p = shadow_p      # fraction of blobs that are shadows vs canopy
 
     def __call__(self, image, mask_u8):
         if random.random() > self.p:
@@ -66,12 +77,19 @@ class CanopyOcclusionOnRoad:
             cx, cy = int(xs[i]), int(ys[i])
             rx = random.randint(*self.blob_r)
             ry = random.randint(*self.blob_r)
-            color = (
-                random.randint(20, 65),
-                random.randint(75, 155),
-                random.randint(15, 60),
-            )
-            cv2.ellipse(out, (cx, cy), (rx, ry), random.uniform(0, 180), 0, 360, color, -1)
+            ang = random.uniform(0, 180)
+            if random.random() < self.shadow_p:
+                # building / cloud shadow: darken the region (multiplicative blend)
+                m = np.zeros(out.shape[:2], np.uint8)
+                cv2.ellipse(m, (cx, cy), (rx, ry), ang, 0, 360, 255, -1)
+                factor = random.uniform(0.25, 0.55)
+                sel = m > 0
+                out[sel] = (out[sel].astype(np.float32) * factor).astype(np.uint8)
+            else:
+                # tree canopy: greenish opaque blob
+                color = (random.randint(20, 65), random.randint(75, 155),
+                         random.randint(15, 60))
+                cv2.ellipse(out, (cx, cy), (rx, ry), ang, 0, 360, color, -1)
         return out
 
 
@@ -222,24 +240,32 @@ def _dice_coef(pred_bin, target):
 
 
 def _relaxed_iou(pred_bin, target, r=3):
+    """Buffered IoU with an r-px tolerance (PS4 'length-complete / relaxed IoU').
+
+    A predicted pixel counts as a hit if a GT road pixel is within r px, and vice
+    versa. Symmetric numerator (avg of both buffered matches) over the strict
+    union, so relaxed_iou >= strict iou and stays bounded in [0,1]. The previous
+    version mixed an exact-target numerator with a dilated-union denominator,
+    which made it read *below* strict IoU.
+    """
     k, pad = 2 * r + 1, r
     t_dil = F.max_pool2d(target.float(), k, stride=1, padding=pad) > 0
     p_dil = F.max_pool2d(pred_bin.float(), k, stride=1, padding=pad) > 0
-    inter = (p_dil & target).float().sum()
-    union = (p_dil | t_dil).float().sum()
+    inter = 0.5 * ((pred_bin & t_dil).float().sum() + (target & p_dil).float().sum())
+    union = (pred_bin | target).float().sum()
     return (inter + 1e-6) / (union + 1e-6)
 
 
 def train_one_epoch(model, loader, optimizer, scaler, device, epoch=0):
     model.train()
-    use_skelrecall = (epoch >= 10)
     total_loss = 0.0
     for imgs, masks in loader:
         imgs, masks = imgs.to(device), masks.to(device)
         optimizer.zero_grad()
         with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
-            loss = combined_loss(logits, masks, use_skelrecall=use_skelrecall)
+            # clDice topology loss runs every epoch (stable, bounded) — no ep10 switch
+            loss = combined_loss(logits, masks, use_topo=True)
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -255,7 +281,7 @@ def validate(model, loader, device):
         imgs, masks = imgs.to(device), masks.to(device)
         with torch.amp.autocast(device_type=device.type, enabled=(device.type == "cuda")):
             logits = model(imgs)
-            loss = combined_loss(logits, masks, use_skelrecall=False)
+            loss = combined_loss(logits, masks, use_topo=False)
         pred_bin = (torch.sigmoid(logits) > 0.5)
         target_bin = (masks > 0.5)
         total_loss += loss.item()
@@ -371,8 +397,7 @@ def run_stage(config, stage):
         scheduler.step()
         val_loss, val_iou, val_dice, val_relaxed = validate(model, val_loader, device)
 
-        skel_flag = "skel+" if epoch >= 10 else "skel-"
-        print(f"[{stage}] epoch {epoch:3d}/{cfg['epochs']}  {skel_flag}  "
+        print(f"[{stage}] epoch {epoch:3d}/{cfg['epochs']}  clDice  "
               f"train_loss={train_loss:.4f}  val_loss={val_loss:.4f}  "
               f"iou={val_iou:.4f}  dice={val_dice:.4f}  relaxed_iou={val_relaxed:.4f}")
 
