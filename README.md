@@ -1,97 +1,159 @@
 # SatMesh
 
-Road extraction and network resilience analysis from satellite imagery.
+Occlusion-robust road extraction and network-resilience analysis from satellite imagery.
 
-Built for ISRO Bharatiya Antariksh Hackathon 2026, Problem Statement 4 — Route Resilience.
+Built for the **ISRO Bharatiya Antariksh Hackathon 2026, Problem Statement 4 — Route Resilience.**
 
 ---
 
 ## Problem
 
-Urban road networks extracted from satellite imagery suffer from two compounding failures. First, tree canopy, building shadows, and cloud cover produce fragmented road masks that are topologically disconnected and unusable for routing or disaster planning. Second, even complete road maps rarely quantify which intersections are structural bottlenecks — the single points whose removal would most damage the network.
+Urban road networks extracted from satellite imagery suffer two compounding failures. First, tree canopy, building shadows, and cloud cover produce fragmented road masks that are topologically disconnected and unusable for routing or disaster planning. Second, even complete road maps rarely quantify which intersections are structural bottlenecks — the single points whose removal most damages the network.
 
-SatMesh addresses both: an occlusion-robust segmentation model produces continuous road masks, and a graph-theoretic pipeline identifies critical nodes and measures network resilience under simulated failure.
+SatMesh addresses both: an occlusion-robust **SegFormer** segmentation model produces continuous road masks, and a **graph-theoretic** pipeline heals the gaps, identifies critical "gatekeeper" nodes, and measures network resilience under simulated failure. A web dashboard runs the whole pipeline per city and visualises the result.
+
+---
+
+## Pipeline
+
+```
+satellite tile ──▶ SegFormer (road mask) ──▶ skeletonise ──▶ MST gap-healing
+   (Esri / Sentinel-2)                                         (occlusion-aware,
+                                                                extended-line)
+        │                                                            │
+        └────────────────────────────────────────────────┐         ▼
+                                                  betweenness criticality
+                                                  + node-ablation stress test
+                                                  + Resilience Index + APLS
+```
+
+The same trained model feeds both the offline evaluation and the live dashboard.
 
 ---
 
 ## Repository layout
 
 ```
-track_a/
-    road_segmentation.py     U-Net road segmentation with clDice loss
-track_b/
-    graph_resilience.py      Betweenness centrality + resilience stress test
-docs/
-    problem_statement.md     Full PS4 specification
-    approach.md              Technical approach and build plan
-    getting_started.md       Data sources and week-1 checklist
-research/                    Background notes and proposal drafts
-requirements.txt
+src/
+  model/
+    segformer.py        SegFormer MiT-B4 (3-ch RGB and 4-ch RGB+NIR builders)
+    loss.py             Dice + weighted-BCE + soft-clDice (topology) loss
+    train.py            two-stage trainer, RoadDS, occlusion augmentation
+    infer.py            mask prediction (CUDA / MPS / CPU)
+  graph/
+    skeleton.py         mask -> nodes/edges graph
+    heal.py             MST gap-healing with extended-line (occlusion-aware) bridging
+    criticality.py      betweenness centrality + node-ablation curve
+    zones.py            critical / vulnerable / resilient zone classification
+    apls.py             Average Path Length Score vs OSM
+    dem.py              SRTM elevation + flood-vulnerable node marking
+  data/
+    sentinel_dl.py      Sentinel-2 download (Microsoft Planetary Computer STAC)
+    mask_raster.py      OSM road fetch + rasterise to masks
+    city_config.py      cities.json loader
+  pipeline.py           end-to-end: mask -> graph -> criticality -> APLS
+
+scripts/
+  build_highres_dataset.py   Esri World Imagery (~0.6 m) + OSM masks, 29 regions
+  prepare_india_dataset.py   Sentinel-2 (10 m) tiles + published India dataset ingest
+  auto_label.py              self-training pseudo-labels fused with OSM
+  train.py                   training launcher (stage-1 pretrain, stage-2 fine-tune)
+  kaggle_b4_train.py         Kaggle T4 runner
+
+api/
+  main.py             FastAPI: cities, run (SSE), metrics, graph, reroute/scenario
+  pipeline_runner.py  streams pipeline progress
+  graph_api.py        rerouting / node-disable / stress scenarios
+dashboard/web/        MapLibre GL dashboard (graph / heatmap / mask / satellite)
+
+cities.json           dashboard cities (bbox, center, flood threshold)
+data/train_regions.json   29 training regions (metros, rural, terrains)
+eval/                 track_a.py, apls_eval.py, full_eval.py
+docs/                 problem_statement.md, approach.md, getting_started.md
+checkpoints/          segformer_india_v1.pth, segformer_india_v2.pth
 ```
 
 ---
 
-## Track A — Road Segmentation
+## Segmentation model
 
-**Model.** U-Net with a pretrained ResNet-34 encoder (`segmentation-models-pytorch`). Trained on the DeepGlobe Road Extraction Dataset (6,226 RGB images at 50 cm/px with pixel-level road masks).
+**Architecture.** True SegFormer (`smp.Segformer`, MiT-B4 encoder) — a transformer whose global self-attention provides the long-range context needed to infer roads under canopy and shadow.
 
-**Loss.** Combined Dice (0.4) + BCE (0.3) + clDice (0.3).
+**Resolution matters.** Road width is the hard constraint:
+- **High-res (~0.3–0.6 m)** — Esri World Imagery, DeepGlobe, Cartosat-3. Dense urban lanes/gullies are visible; strict IoU > 70 % is achievable.
+- **Sentinel-2 (10 m)** — roads are 1–2 px / sub-pixel; only major arterials resolve. Use relaxed-IoU.
 
-The clDice term (Shit et al., CVPR 2021) computes Dice on the soft skeleton of the prediction rather than on the mask itself. Because the skeleton collapses to centerlines, the loss directly penalises broken road segments — which is exactly what the PS4 rubric measures as Occlusion-Recall.
+So SatMesh trains per target resolution. The primary path is **high-res Esri + OSM** (`build_highres_dataset.py`).
 
-**Augmentation.** `CoarseDropout` and `RandomShadow` are applied during training to simulate tree canopy occlusion and building shadow. This forces the model to learn gap-bridging rather than pixel matching.
+**Loss.** `Dice (0.4) + weighted-BCE (0.3) + soft-clDice (0.3)`. The clDice term (Shit et al., CVPR 2021) is a bidirectional topology loss on soft skeletons — it penalises both broken and hallucinated roads, directly targeting connectivity under occlusion. Runs every epoch (stable).
 
-**Optimiser.** AdamW with a one-cycle LR schedule. Best checkpoint (by validation IoU) is saved to `best_model.pth`.
+**Occlusion augmentation.** `CanopyOcclusionOnRoad` paints green tree canopy and dark building shadows over road pixels across a wide size range, so the model learns to bridge gaps of varying length (per the Chesapeake-RSC "Seeing Roads Through Trees" finding that recall falls with gap distance).
 
-### Running on Kaggle (recommended, free GPU)
+**Auto-labelling.** `auto_label.py` runs the trained model over fresh tiles and fuses confident predictions with OSM (`mask = OSM ∪ confident-model`), growing label coverage past OSM's gaps without removing verified roads.
 
-1. Open the [DeepGlobe dataset](https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset).
-2. Click **New Notebook** → Settings → Accelerator → GPU T4.
-3. Paste `track_a/road_segmentation.py` into a cell and run.
-4. Outputs: `ps4_predictions.png` (satellite / ground truth / prediction grid) and `best_model.pth`.
+---
 
-Typical runtime: 12 minutes for 8 epochs on a T4 with `SUBSET = 800`.
+## Graph resilience
 
-### Running locally
+From a predicted mask, `pipeline.py`:
+1. **Skeletonises** the mask into a node/edge graph.
+2. **Heals gaps** — MST bridging gated by distance, stub angle, and an **extended-line mask check**: a road broken by shadow still leaves faint road pixels along the connector, while a bridge over open background does not.
+3. **Scores criticality** — betweenness centrality finds gatekeeper intersections; node-ablation removes the top nodes and recomputes global efficiency.
+4. **Resilience Index** — baseline vs perturbed average shortest-path; lower = more vulnerable.
+5. **APLS** vs the OSM graph for topological accuracy.
+
+A cache guard stages each run in `outputs/<city>/run_<ts>/` and only promotes it if the graph is non-degenerate, so a bad inference can't overwrite known-good outputs.
+
+---
+
+## Running the dashboard
 
 ```bash
 pip install -r requirements.txt
-# Set DATA_DIR in road_segmentation.py to your DeepGlobe train/ folder.
-python track_a/road_segmentation.py
+uvicorn api.main:app --port 8011 --reload
+# open http://localhost:8011
 ```
+
+Pick a city, click **Run Pipeline** (streams progress via SSE), then explore the
+graph / criticality heatmap / road mask / satellite views, run flood/seismic/
+gatekeeper-collapse stress tests, and compute reroutes.
 
 ---
 
-## Track B — Graph Resilience
+## Training
 
-Takes a road network (from OSM or a predicted mask) and computes:
-
-1. **Betweenness centrality** — identifies gatekeeper intersections whose removal most disrupts routing.
-2. **Node-ablation stress test** — removes the top node, recomputes average shortest-path length.
-3. **Resilience Index** — `baseline_avg_path / perturbed_avg_path`. Values below 1 indicate the network degraded after the removal.
-
-The default study area is central Bengaluru (lat 12.9716, lon 77.5946, 1500 m radius). Change `CITY_POINT` and `RADIUS_M` for any other city.
+Two checkpoints, multi-resolution (see `~/.claude/plans/` / `docs/approach.md`):
 
 ```bash
-pip install osmnx networkx matplotlib
-python track_b/graph_resilience.py
+# Checkpoint B — high-res 0.5 m base (DeepGlobe), strict-IoU target
+python scripts/train.py --encoder mit_b4 --img-size 768 --batch 14 \
+    --grad-checkpoint --epochs 50
+
+# Build the India high-res dataset (Esri + OSM, 29 regions) — needs internet
+python scripts/build_highres_dataset.py --regions all --zoom 18 --windows 30 \
+    --out data/india_highres/train
+
+# Checkpoint A — fine-tune the 3-ch base on high-res India RGB
+python scripts/train.py --skip-stage1 --no-nir \
+    --india-dir data/india_highres/train \
+    --encoder mit_b4 --img-size 512 --batch2 4 --epochs2 30 --grad-checkpoint
 ```
 
-Outputs: printed centrality scores + Resilience Index, and `ps4_bengaluru_roadgraph.png`.
+`--clahe` enables CLAHE+gamma enhancement (recommended for the 10 m Sentinel-2 path).
 
 ---
 
 ## Evaluation targets (PS4 rubric)
 
-| Metric | Track | Notes |
+| Metric | Stage | Notes |
 |---|---|---|
-| IoU / Dice | A | Measured on DeepGlobe val split |
-| Occlusion-Recall | A | clDice loss targets this directly |
-| Connectivity Ratio | A → B | % increase in largest connected component after MST healing |
-| Topological Accuracy | B | Average path-length error vs OSM ground truth |
-| Resilience Index | B | Baseline / perturbed avg shortest path |
+| IoU / Dice | segmentation | strict on high-res; relaxed (3–5 px) on 10 m |
+| Occlusion-Recall | segmentation | clDice + occlusion augmentation target this |
+| Connectivity Ratio | graph | largest connected component after MST healing |
+| Topological Accuracy | graph | APLS vs OSM ground truth |
+| Resilience Index | graph | baseline / perturbed average shortest path |
 
-Scoring is 50% Track A / 50% Track B.
+Scoring is **50 % segmentation / 50 % graph-theoretic resilience.**
 
 ---
 
@@ -99,23 +161,24 @@ Scoring is 50% Track A / 50% Track B.
 
 | Dataset | Use | Access |
 |---|---|---|
-| DeepGlobe Road Extraction | Track A training | [Kaggle](https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset) |
-| SpaceNet Roads | Additional pretraining | [spacenet.ai](https://spacenet.ai/challenges/) |
-| OpenStreetMap | Graph baseline + ground truth masks | `osmnx` (no account needed) |
-| Resourcesat LISS-IV | Indian imagery inference | [Bhoonidhi portal](https://bhoonidhi.nrsc.gov.in/) |
-| Cartosat-3 | High-res challenge data | Provided by ISRO during the finale |
+| Esri World Imagery | high-res training imagery (~0.6 m) | XYZ tiles (no key) |
+| OpenStreetMap | auto-generated masks + graph baseline | `osmnx` (ODbL) |
+| DeepGlobe Road Extraction | 0.5 m pretraining | [Kaggle](https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset) |
+| Sentinel-2 (Planetary Computer) | 10 m India inference/training | STAC API |
+| India Sentinel-2 Roads | 10 m India fine-tune (5634 tiles) | [Zenodo 15765738](https://zenodo.org/records/15765738) |
+| PMGSY GeoSadak / MoRTH / Bhuvan | govt road vectors (`--road-vectors`) | open-government |
+| Resourcesat LISS-IV / Cartosat-3 | Indian imagery (5.8 m / high-res) | [Bhoonidhi](https://bhoonidhi.nrsc.gov.in/) / ISRO finale |
 
 ---
 
 ## Dependencies
 
 ```
-torch >= 2.0
-segmentation-models-pytorch >= 0.3
-albumentations >= 1.3
-opencv-python >= 4.8
-osmnx >= 1.9
-networkx >= 3.2
+torch >= 2.0          segmentation-models-pytorch >= 0.3
+albumentations >= 1.3 opencv-python >= 4.8
+osmnx >= 2.0          networkx >= 3.2
+rasterio              geopandas
+fastapi               uvicorn
 ```
 
 Full list in `requirements.txt`.
