@@ -72,7 +72,7 @@ def run_pipeline(
 
     yield from emit("healing", 38)
     pixel_size_deg = cfg.pixel_m / 111_000.0
-    G_healed = heal_gaps(G_skel, max_gap_m=50.0, angular_threshold=0.3)
+    G_healed = heal_gaps(G_skel, max_gap_m=50.0, angular_threshold=0.3, road_mask=mask)
     G_healed = add_geo_coords(G_healed, cfg.center[0], cfg.center[1],
                                pixel_size_deg=pixel_size_deg)
 

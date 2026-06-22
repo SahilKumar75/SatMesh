@@ -43,7 +43,29 @@ def _endpoint_heading(G, node):
     return vec / norm if norm > 0 else vec
 
 
-def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None):
+def _line_road_support(road_mask, G, a, b):
+    """Fraction of the straight line a->b (in mask pixel space) that overlaps road.
+
+    Extended-line heuristic (SAM-Road++): a road broken by a tree/building shadow
+    still leaves faint road pixels along the connecting line, while a bridge across
+    open background does not. Lets healing connect occluded roads and refuse
+    hallucinated ones.
+    """
+    r0, c0 = G.nodes[a].get("row"), G.nodes[a].get("col")
+    r1, c1 = G.nodes[b].get("row"), G.nodes[b].get("col")
+    if None in (r0, c0, r1, c1):
+        return None
+    n = max(2, int(np.hypot(r1 - r0, c1 - c0)))
+    rr = np.linspace(r0, r1, n).round().astype(int)
+    cc = np.linspace(c0, c1, n).round().astype(int)
+    ok = (rr >= 0) & (rr < road_mask.shape[0]) & (cc >= 0) & (cc < road_mask.shape[1])
+    if ok.sum() == 0:
+        return 0.0
+    return float((road_mask[rr[ok], cc[ok]] > 0).mean())
+
+
+def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None,
+              road_mask=None, min_support=0.2, strong_support=0.6):
     stubs = [n for n in G.nodes if G.degree(n) == 1]
     uf = UnionFind(max(G.nodes) + 1 if G.nodes else 1)
     for n in G.nodes:
@@ -71,7 +93,13 @@ def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None):
                     and ndvi_mask[mr, mc] > 0):
                 effective_max_gap = max_gap_m * 2.0
 
-        if dist > effective_max_gap:
+        # Mask support along the candidate line (extended-line heuristic).
+        support = _line_road_support(road_mask, G, a, b) if road_mask is not None else None
+        strong = support is not None and support >= strong_support
+
+        # Distance gate — strong mask evidence of an occluded road may bridge a
+        # longer gap (up to 2x), since the road is visibly continuous underneath.
+        if dist > effective_max_gap and not (strong and dist <= 2 * effective_max_gap):
             continue
 
         ha = _endpoint_heading(G, a)
@@ -81,8 +109,14 @@ def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None):
         if bn > 0:
             bridge_dir /= bn
 
+        # Angular gate — strong mask support can override it (curved roads under
+        # canopy whose stubs don't point straight at each other).
         dot = float(np.dot(ha, bridge_dir))
-        if dot > -angular_threshold:
+        if dot > -angular_threshold and not strong:
+            continue
+
+        # Precision — with a mask available, never bridge across clear background.
+        if support is not None and support < min_support:
             continue
 
         G.add_edge(a, b, length=dist, synthetic=True)
