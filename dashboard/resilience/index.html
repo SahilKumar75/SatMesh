@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SatMesh · Route Resilience · Bengaluru</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a313c;
+    --text:#e6edf3; --muted:#8b949e; --faint:#6e7681; --accent:#58a6ff;
+    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#1f6feb;
+    --radius:10px; --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);
+    -webkit-font-smoothing:antialiased}
+  #app{display:grid;grid-template-rows:54px 1fr;height:100vh}
+  /* top bar */
+  header{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#11161f,#0d1117)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.2px}
+  .logo{width:22px;height:22px;border-radius:6px;background:
+    conic-gradient(from 220deg,var(--green),var(--amber),var(--red),var(--green))}
+  .tag{font-size:11px;font-weight:600;color:var(--accent);border:1px solid #213049;
+    background:#0e1b2e;padding:3px 8px;border-radius:6px;letter-spacing:.4px}
+  header .spacer{flex:1}
+  .src{font-size:11.5px;color:var(--faint)}
+  .src b{color:var(--muted);font-weight:500}
+  /* layout */
+  main{display:grid;grid-template-columns:1fr 372px;min-height:0}
+  #map{height:100%}
+  aside{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:16px}
+  aside::-webkit-scrollbar{width:8px}
+  aside::-webkit-scrollbar-thumb{background:#262d38;border-radius:4px}
+  .sec{margin-bottom:18px}
+  .sec h2{font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);
+    font-weight:600;margin:0 0 10px}
+  /* metric grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .card{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px}
+  .card .v{font-size:21px;font-weight:650;line-height:1.1;font-variant-numeric:tabular-nums}
+  .card .l{font-size:10.5px;color:var(--muted);margin-top:3px;letter-spacing:.2px}
+  .card.big{grid-column:span 2}
+  .card.big .v{font-size:27px}
+  /* view toggle */
+  .toggle{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px}
+  .toggle button{flex:1;border:0;background:transparent;color:var(--muted);font-family:inherit;
+    font-size:12px;font-weight:550;padding:7px;border-radius:6px;cursor:pointer;transition:.15s}
+  .toggle button.on{background:#243049;color:var(--text)}
+  /* slider */
+  .slabel{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+  .slabel b{color:var(--text);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;-webkit-appearance:none;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,#1a2740,#1f6feb);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+    background:#fff;border:3px solid var(--blue);cursor:pointer;box-shadow:0 1px 4px #0008}
+  /* resilience readout */
+  .readouts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px}
+  .ro{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;text-align:center}
+  .ro .v{font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+  .ro .l{font-size:9.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+  /* mini chart */
+  .chart{margin-top:13px;height:74px;display:flex;align-items:flex-end;gap:2px}
+  .bar{flex:1;background:#243049;border-radius:2px 2px 0 0;position:relative;transition:.1s}
+  .bar.cur{outline:1.5px solid var(--accent);outline-offset:0}
+  .chart-x{display:flex;justify-content:space-between;font-size:9.5px;color:var(--faint);margin-top:5px}
+  /* legend */
+  .legend{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:9px}
+  .ramp{flex:1;height:8px;border-radius:4px;
+    background:linear-gradient(90deg,var(--green),var(--amber),var(--red))}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-right:14px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .note{font-size:11px;color:var(--faint);line-height:1.5;margin-top:6px}
+  .foot{font-size:10.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:11px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><div class="logo"></div> SatMesh</div>
+    <span class="tag">ISRO BAH 2026 · PS4 · ROUTE RESILIENCE</span>
+    <div class="spacer"></div>
+    <div class="src">City: <b id="cityName">—</b> &nbsp;·&nbsp; Data: <b>OpenStreetMap + SRTM (Terrarium)</b></div>
+  </header>
+  <main>
+    <div id="map"></div>
+    <aside>
+      <div class="sec">
+        <h2>Road Network (real, extracted)</h2>
+        <div class="grid">
+          <div class="card"><div class="v" id="mNodes">—</div><div class="l">Intersections (nodes)</div></div>
+          <div class="card"><div class="v" id="mEdges">—</div><div class="l">Road segments (edges)</div></div>
+          <div class="card"><div class="v" id="mGate">—</div><div class="l">Gatekeeper nodes</div></div>
+          <div class="card"><div class="v" id="mFC">—</div><div class="l">Flood-critical assets</div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>Map view</h2>
+        <div class="toggle">
+          <button id="vCrit" class="on">Criticality Worth</button>
+          <button id="vFlood">Flood Simulation</button>
+        </div>
+        <div class="legend"><span>Low</span><div class="ramp"></div><span>High</span></div>
+        <div class="note">Criticality Worth = betweenness centrality. Red links are single points of
+          failure — disabling them most fragments routing.</div>
+      </div>
+
+      <div class="sec">
+        <h2>Flood Resilience Simulation</h2>
+        <div class="slabel">Water level <b><span id="lvl">—</span> m</b></div>
+        <input type="range" id="flood" min="0" max="100" value="0" />
+        <div class="readouts">
+          <div class="ro"><div class="v" id="rSub" style="color:var(--blue)">0%</div><div class="l">Submerged</div></div>
+          <div class="ro"><div class="v" id="rConn">100%</div><div class="l">Connectivity</div></div>
+          <div class="ro"><div class="v" id="rRes" style="color:var(--green)">1.00</div><div class="l">Resilience Idx</div></div>
+        </div>
+        <div class="chart" id="chart"></div>
+        <div class="chart-x"><span id="xlo">—</span><span>water level →</span><span id="xhi">—</span></div>
+        <div class="note">Rising water submerges low-elevation roads (real SRTM). The network fragments;
+          the <b>Resilience Index</b> (baseline ÷ perturbed efficiency) falls as it does — lower = more vulnerable.</div>
+      </div>
+
+      <div class="sec">
+        <div class="pill"><span class="dot" style="background:var(--red)"></span>Gatekeeper node</div>
+        <div class="pill"><span class="dot" style="background:var(--blue)"></span>Flood-critical</div>
+      </div>
+
+      <div class="foot" id="foot">Loading real Bengaluru network…</div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const C = {green:'#3fb950', amber:'#d29922', red:'#f85149', blue:'#1f6feb', dim:'#3a4350'};
+
+function critColor(t){ // 0..1 -> green->amber->red
+  const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));
+  const g=[63,185,80],a=[210,153,34],r=[248,81,73];
+  const c = t<0.5 ? lerp(g,a,t/0.5) : lerp(a,r,(t-0.5)/0.5);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+const map = new maplibregl.Map({
+  container:'map',
+  style:'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+  center:[77.590,12.978], zoom:13.2, attributionControl:false
+});
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
+
+let DATA, edgeFC, curve, elevMin, elevMax;
+
+fetch('resilience.json').then(r=>r.json()).then(d=>{
+  DATA=d; curve=d.flood_curve;
+  document.getElementById('cityName').textContent=d.city;
+  const m=d.metrics;
+  document.getElementById('mNodes').textContent=m.n_nodes.toLocaleString();
+  document.getElementById('mEdges').textContent=m.n_edges.toLocaleString();
+  document.getElementById('mGate').textContent=m.gatekeeper_count;
+  document.getElementById('mFC').textContent=m.flood_critical_count;
+  elevMin=m.elev_min_m; elevMax=m.elev_max_m;
+  document.getElementById('xlo').textContent=elevMin+' m';
+  document.getElementById('xhi').textContent=Math.round(curve[curve.length-1].level_m)+' m';
+  document.getElementById('foot').innerHTML=
+    `Real OpenStreetMap drive network · per-node SRTM elevation (${m.elev_min_m}–${m.elev_max_m} m) · `
+    +`betweenness centrality · ${m.n_nodes.toLocaleString()} nodes / ${m.n_edges.toLocaleString()} edges. `
+    +`No synthetic data.`;
+
+  // node lookup
+  const nd={}; d.nodes.forEach(n=>nd[n.id]=n);
+  // edges -> features with crit (max endpoint) + minElev (min endpoint)
+  edgeFC={type:'FeatureCollection',features:d.edges.map(e=>{
+    const a=nd[e.s],b=nd[e.t];
+    return {type:'Feature',geometry:{type:'LineString',coordinates:e.coords},
+      properties:{crit:Math.max(a.crit,b.crit), minElev:Math.min(a.elev,b.elev),
+        color:critColor(Math.max(a.crit,b.crit))}};
+  })};
+  // special node markers
+  const pts={type:'FeatureCollection',features:d.nodes.filter(n=>n.gatekeeper||n.flood_critical)
+    .map(n=>({type:'Feature',geometry:{type:'Point',coordinates:[n.lon,n.lat]},
+      properties:{kind:n.flood_critical?'flood':'gate'}}))};
+
+  if(map.loaded()) init(); else map.on('load',()=>init());
+  function init(){
+    map.addSource('edges',{type:'geojson',data:edgeFC});
+    map.addLayer({id:'edges',type:'line',source:'edges',
+      layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':['get','color'],
+        'line-width':['interpolate',['linear'],['zoom'],11,['+',0.5,['*',2.5,['get','crit']]],
+                                                     15,['+',1.2,['*',4.5,['get','crit']]]],
+        'line-opacity':0.92}});
+    map.addSource('pts',{type:'geojson',data:pts});
+    map.addLayer({id:'pts',type:'circle',source:'pts',
+      paint:{'circle-radius':['case',['==',['get','kind'],'gate'],5.5,4.5],
+        'circle-color':['case',['==',['get','kind'],'gate'],C.red,C.blue],
+        'circle-stroke-width':1.5,'circle-stroke-color':'#0d1117'}});
+    buildChart(); setFlood(0);
+  }
+});
+
+let view='crit';
+document.getElementById('vCrit').onclick=()=>setView('crit');
+document.getElementById('vFlood').onclick=()=>setView('flood');
+function setView(v){
+  view=v;
+  document.getElementById('vCrit').classList.toggle('on',v==='crit');
+  document.getElementById('vFlood').classList.toggle('on',v==='flood');
+  applyPaint();
+}
+
+const slider=document.getElementById('flood');
+slider.oninput=()=>setFlood(+slider.value);
+let curLevel;
+function setFlood(pct){
+  curLevel = elevMin + (elevMax-elevMin)*(pct/100);
+  document.getElementById('lvl').textContent=curLevel.toFixed(0);
+  // interpolate the precomputed curve by level
+  let row=curve[0];
+  for(const r of curve){ if(r.level_m<=curLevel) row=r; }
+  document.getElementById('rSub').textContent=Math.round(row.flooded_frac*100)+'%';
+  document.getElementById('rConn').textContent=Math.round(row.lcc_frac*100)+'%';
+  const res=row.resilience;
+  const rEl=document.getElementById('rRes');
+  rEl.textContent=res.toFixed(2);
+  rEl.style.color = res>0.7?C.green : res>0.4?C.amber : C.red;
+  // highlight current chart bar
+  document.querySelectorAll('.bar').forEach((b,i)=>b.classList.toggle('cur',
+    curve[i].level_m<=curLevel && (i===curve.length-1||curve[i+1].level_m>curLevel)));
+  if(map.getLayer('edges')) applyPaint();
+}
+function applyPaint(){
+  if(!map.getLayer('edges')) return;
+  if(view==='flood'){
+    map.setPaintProperty('edges','line-color',
+      ['case',['<=',['get','minElev'],curLevel], C.blue, C.dim]);
+    map.setPaintProperty('edges','line-opacity',
+      ['case',['<=',['get','minElev'],curLevel],0.95,0.35]);
+  }else{
+    map.setPaintProperty('edges','line-color',['get','color']);
+    map.setPaintProperty('edges','line-opacity',0.92);
+  }
+}
+function buildChart(){
+  const el=document.getElementById('chart'); el.innerHTML='';
+  curve.forEach(r=>{
+    const b=document.createElement('div'); b.className='bar';
+    b.style.height=(8+r.resilience*100*0.62)+'%';
+    b.style.background=r.resilience>0.7?'#243f31':r.resilience>0.4?'#3a3320':'#3f2526';
+    el.appendChild(b);
+  });
+}
+</script>
+</body>
+</html>
