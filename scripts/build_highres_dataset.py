@@ -114,16 +114,33 @@ def tile_and_write(rgb, mask, prefix, out_dir, tile=512, min_road_frac=0.01,
 
 
 def build_region(cid, cfg, out_dir, z, grid, windows, tile, buffer_px,
-                 min_road_frac, session):
+                 min_road_frac, session, extra_roads=None):
     import random
+    import geopandas as gpd
+    import pandas as pd
     from src.data.mask_raster import fetch_osm_roads
 
-    print(f"[{cid}] terrain={cfg.terrain} bbox={cfg.bbox} — OSM roads...", flush=True)
-    roads = fetch_osm_roads(cfg.bbox)            # GeoSeries, EPSG:4326
-    if len(roads) == 0:
-        print(f"[{cid}] no OSM roads — skipping")
+    print(f"[{cid}] terrain={cfg.terrain} bbox={cfg.bbox} — OSM roads (all)...", flush=True)
+    parts = []
+    try:
+        # network_type="all" includes service/residential/track/path/footway —
+        # i.e. colony lanes and gullies, not just car-drivable roads
+        roads = fetch_osm_roads(cfg.bbox, network_type="all")
+        if len(roads):
+            parts.append(roads.to_crs("EPSG:4326"))
+    except Exception as e:
+        print(f"[{cid}] OSM fetch failed ({e}) — relying on --road-vectors if any")
+    if extra_roads is not None:
+        south, west, north, east = cfg.bbox
+        clip = extra_roads.cx[west:east, south:north]   # govt/ISRO vectors in this bbox
+        if len(clip):
+            print(f"[{cid}] + {len(clip)} road features from --road-vectors")
+            parts.append(clip)
+    if not parts:
+        print(f"[{cid}] no roads from any source — skipping")
         return 0
-    roads_merc = roads.to_crs("EPSG:3857")
+    allroads = gpd.GeoSeries(pd.concat(parts, ignore_index=True), crs="EPSG:4326")
+    roads_merc = allroads.to_crs("EPSG:3857")
 
     south, west, north, east = cfg.bbox
     xt0 = int(math.floor(deg2tile(north, west, z)[0]))
@@ -185,6 +202,9 @@ def main():
     ap.add_argument("--windows", type=int, default=25, help="random windows per region")
     ap.add_argument("--tile", type=int, default=512, help="output tile size px")
     ap.add_argument("--buffer-px", type=int, default=3, help="road half-width in px")
+    ap.add_argument("--road-vectors", default=None,
+                    help="comma-separated shapefile/GeoJSON/Parquet of extra road "
+                         "lines (e.g. PMGSY GeoSadak, NHAI, Bhuvan) merged with OSM")
     ap.add_argument("--min-road-frac", type=float, default=0.01,
                     help="drop tiles with fewer than this fraction of road pixels")
     ap.add_argument("--out", default="data/india_highres/train")
@@ -196,12 +216,25 @@ def main():
     import requests
     session = requests.Session()
 
+    extra_roads = None
+    if args.road_vectors:
+        import geopandas as gpd
+        import pandas as pd
+        gs = []
+        for p in args.road_vectors.split(","):
+            g = gpd.read_file(p.strip())
+            if g.crs is None:
+                g = g.set_crs("EPSG:4326")
+            gs.append(g.to_crs("EPSG:4326").geometry)
+        extra_roads = gpd.GeoSeries(pd.concat(gs, ignore_index=True), crs="EPSG:4326")
+        print(f"loaded {len(extra_roads)} extra road features from {args.road_vectors}")
+
     total = 0
     for cid, cfg in resolve_regions(args.regions, args.regions_file).items():
         try:
             total += build_region(cid, cfg, out_dir, args.zoom, args.grid,
                                    args.windows, args.tile, args.buffer_px,
-                                   args.min_road_frac, session)
+                                   args.min_road_frac, session, extra_roads)
         except Exception as e:
             print(f"[{cid}] FAILED: {e}")
 
