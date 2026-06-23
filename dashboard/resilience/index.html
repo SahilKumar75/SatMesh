@@ -77,16 +77,30 @@
     cursor:pointer;display:flex;align-items:center;justify-content:center}
   .play svg{width:18px;height:18px}
   .tl-body{flex:1;min-width:0}
-  .tl-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
-  .tl-title{font-family:var(--display);font-weight:600;font-size:14px}
-  .tl-sub{font-size:11.5px;color:var(--muted)}
-  .tl-state{margin-left:auto;font-size:11.5px;color:var(--blue);font-weight:600}
+  .tl-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;white-space:nowrap}
+  .tl-title{font-family:var(--display);font-weight:600;font-size:14px;flex:none}
+  .tl-sub{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .tl-state{margin-left:auto;font-size:11.5px;color:var(--blue);font-weight:600;flex:none}
   .track{position:relative;height:6px;border-radius:3px;background:#222a36;cursor:pointer}
   .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
     background:linear-gradient(90deg,#2f81f7,#58a6ff)}
   .track .head{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;
     border:3px solid var(--blue);transform:translate(-50%,-50%);box-shadow:0 1px 4px #0008}
   .ticks{display:flex;justify-content:space-between;margin-top:8px;font-size:10.5px;color:var(--faint)}
+  /* keep panel, basemap toggle and timeline aligned as the window narrows */
+  @media (max-width:1240px){
+    main{grid-template-columns:1fr 320px}
+    .basemap{right:332px}
+    .timeline{right:340px;left:18px}
+    aside{padding:13px;padding-bottom:120px}
+  }
+  @media (max-width:1000px){
+    main{grid-template-columns:1fr 280px}
+    .basemap{right:292px}
+    .timeline{right:300px;left:14px;padding:11px 14px}
+    .tl-sub{display:none}
+    .card .v{font-size:18px}
+  }
 </style>
 </head>
 <body>
@@ -190,7 +204,7 @@ function critColor(t){
 }
 
 const map=new maplibregl.Map({container:'map',style:DARK,center:[77.590,12.978],zoom:13.2,attributionControl:false});
-map.addControl(new maplibregl.NavigationControl({showCompass:false}),'bottom-right');
+map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-left');
 
 let DATA,edgeFC,ptsFC,curve,elevMin,elevMax,curLevel,view='crit';
 const STEPS=48;                       // timeline resolution
