@@ -96,7 +96,8 @@ def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None,
             return (mask is not None and 0 <= mr < mask.shape[0]
                     and 0 <= mc < mask.shape[1] and mask[mr, mc] > 0)
 
-        if _under(ndvi_mask) or _under(shadow_mask):
+        occluded = _under(ndvi_mask) or _under(shadow_mask)
+        if occluded:
             effective_max_gap = max_gap_m * 2.0
 
         # Mask support along the candidate line (extended-line heuristic).
@@ -115,10 +116,11 @@ def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None,
         if bn > 0:
             bridge_dir /= bn
 
-        # Angular gate — strong mask support can override it (curved roads under
-        # canopy whose stubs don't point straight at each other).
+        # Angular gate — strong mask support OR a known occlusion can override it:
+        # under a shadow / canopy the exact stub trajectory is unreliable, so we
+        # trust topology and allow the bridge even when the headings do not line up.
         dot = float(np.dot(ha, bridge_dir))
-        if dot > -angular_threshold and not strong:
+        if dot > -angular_threshold and not strong and not occluded:
             continue
 
         # Precision — with a mask available, never bridge across clear background.
