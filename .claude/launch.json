@@ -9,7 +9,7 @@
     },
     {
       "name": "resilience",
-      "runtimeExecutable": "python3",
+      "runtimeExecutable": "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
       "runtimeArgs": ["-m", "http.server", "8090", "--directory", "dashboard/resilience"],
       "port": 8090
     }
