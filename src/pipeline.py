@@ -19,8 +19,10 @@ def run_pipeline(
     import torch
     from src.data.city_config import load_city
     from src.model.infer import load_model, predict_mask
-    from src.graph.skeleton import skeletonize_mask, extract_nodes, trace_edges, build_skeleton_graph
+    from src.graph.skeleton import (skeletonize_mask, extract_nodes, trace_edges,
+                                     build_skeleton_graph, tag_node_roles)
     from src.graph.heal import heal_gaps, add_geo_coords
+    from src.graph.occlusion import detect_shadow_mask
     from src.graph.dem import fetch_srtm_dem, attach_elevation, mark_flood_nodes
     from src.graph.criticality import compute_betweenness, ablation_curve
     from src.graph.zones import classify_zones, zones_to_geojson
@@ -72,7 +74,10 @@ def run_pipeline(
 
     yield from emit("healing", 38)
     pixel_size_deg = cfg.pixel_m / 111_000.0
-    G_healed = heal_gaps(G_skel, max_gap_m=50.0, angular_threshold=0.3, road_mask=mask)
+    shadow_mask = detect_shadow_mask(cv2.imread(sat_path))   # occlusion prior
+    G_healed = heal_gaps(G_skel, max_gap_m=50.0, angular_threshold=0.3,
+                         road_mask=mask, shadow_mask=shadow_mask)
+    G_healed = tag_node_roles(G_healed)   # endpoint / junction / through
     G_healed = add_geo_coords(G_healed, cfg.center[0], cfg.center[1],
                                pixel_size_deg=pixel_size_deg)
 
@@ -139,6 +144,8 @@ def run_pipeline(
             1 for n, d in G_healed.nodes(data=True)
             if d.get("flood_vulnerable") and zones.get(n) == "critical"
         ),
+        "junction_count": sum(1 for _, d in G_healed.nodes(data=True) if d.get("role") == "junction"),
+        "endpoint_count": sum(1 for _, d in G_healed.nodes(data=True) if d.get("role") == "endpoint"),
         "ablation": ablation,
     }
 

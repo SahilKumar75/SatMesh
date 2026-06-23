@@ -65,7 +65,7 @@ def _line_road_support(road_mask, G, a, b):
 
 
 def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None,
-              road_mask=None, min_support=0.2, strong_support=0.6):
+              shadow_mask=None, road_mask=None, min_support=0.2, strong_support=0.6):
     stubs = [n for n in G.nodes if G.degree(n) == 1]
     uf = UnionFind(max(G.nodes) + 1 if G.nodes else 1)
     for n in G.nodes:
@@ -84,14 +84,20 @@ def heal_gaps(G, max_gap_m=50.0, angular_threshold=0.3, ndvi_mask=None,
         dy, dx = by - ay, bx - ax
         dist = float(np.hypot(dy, dx))
 
+        # Relax the gap limit when the bridge midpoint falls under a known
+        # occlusion (tree canopy via NDVI, or building/tree shadow): a road is
+        # likely continuous underneath, so allow a longer healed span there.
         effective_max_gap = max_gap_m
-        if ndvi_mask is not None:
-            mid_row = (G.nodes[a].get("row", ay) + G.nodes[b].get("row", by)) / 2.0
-            mid_col = (G.nodes[a].get("col", ax) + G.nodes[b].get("col", bx)) / 2.0
-            mr, mc = int(mid_row), int(mid_col)
-            if (0 <= mr < ndvi_mask.shape[0] and 0 <= mc < ndvi_mask.shape[1]
-                    and ndvi_mask[mr, mc] > 0):
-                effective_max_gap = max_gap_m * 2.0
+        mid_row = (G.nodes[a].get("row", ay) + G.nodes[b].get("row", by)) / 2.0
+        mid_col = (G.nodes[a].get("col", ax) + G.nodes[b].get("col", bx)) / 2.0
+        mr, mc = int(mid_row), int(mid_col)
+
+        def _under(mask):
+            return (mask is not None and 0 <= mr < mask.shape[0]
+                    and 0 <= mc < mask.shape[1] and mask[mr, mc] > 0)
+
+        if _under(ndvi_mask) or _under(shadow_mask):
+            effective_max_gap = max_gap_m * 2.0
 
         # Mask support along the candidate line (extended-line heuristic).
         support = _line_road_support(road_mask, G, a, b) if road_mask is not None else None

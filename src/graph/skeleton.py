@@ -109,3 +109,15 @@ def build_skeleton_graph(node_positions, edges, pixel_m=0.5):
     for ni, nj, px in edges:
         G.add_edge(ni, nj, length=float(px)*pixel_m, synthetic=False)
     return G
+
+
+def tag_node_roles(G):
+    """Tag each node by its topological role from its degree, so the graph carries
+    explicit "where a road joins / ends" labels (a PS4 expected output):
+      endpoint = degree 1 (road termination), junction = degree >= 3 (intersection),
+      through  = degree 2 (mid-segment). Call after healing so synthetic bridges count.
+    """
+    for n in G.nodes:
+        d = G.degree(n)
+        G.nodes[n]["role"] = "endpoint" if d == 1 else ("junction" if d >= 3 else "through")
+    return G
