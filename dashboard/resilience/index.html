@@ -12,132 +12,112 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a313c;
-    --text:#e6edf3; --muted:#8b949e; --faint:#6e7681; --accent:#58a6ff;
-    --green:#3fb950; --amber:#d29922; --red:#f85149; --blue:#2f81f7; --steel:#5a7d8a;
-    --radius:10px;
-    --font:'IBM Plex Sans',system-ui,sans-serif;
-    --display:'Space Grotesk',system-ui,sans-serif;
+    --bg:#0d1117;--panel:#161b22;--panel2:#1c2230;--border:#2a313c;
+    --text:#e6edf3;--muted:#8b949e;--faint:#6e7681;--accent:#58a6ff;
+    --green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#2f81f7;--orange:#f0883e;
+    --radius:10px;--font:'IBM Plex Sans',system-ui,sans-serif;--display:'Space Grotesk',system-ui,sans-serif;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);
-    -webkit-font-smoothing:antialiased}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
   #app{display:grid;grid-template-rows:54px 1fr;height:100vh}
-  header{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);
-    background:linear-gradient(180deg,#11161f,#0d1117)}
-  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:600;
-    font-size:16px;letter-spacing:.3px}
-  .brand svg{display:block}
-  .tag{font-family:var(--display);font-size:11px;font-weight:600;color:var(--accent);
-    border:1px solid #213049;background:#0e1b2e;padding:3px 9px;border-radius:6px;letter-spacing:.5px}
+  header{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#11161f,#0d1117)}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:.3px}
+  .tag{font-family:var(--display);font-size:11px;font-weight:600;color:var(--accent);border:1px solid #213049;background:#0e1b2e;padding:3px 9px;border-radius:6px;letter-spacing:.5px}
   header .spacer{flex:1}
-  .src{font-size:11.5px;color:var(--faint)}
-  .src b{color:var(--muted);font-weight:500}
-  main{position:relative;display:grid;grid-template-columns:1fr 372px;min-height:0}
+  .src{font-size:11.5px;color:var(--faint)}.src b{color:var(--muted);font-weight:500}
+  .live{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--green);font-weight:600;margin-left:14px}
+  .live .blip{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+  main{position:relative;display:grid;grid-template-columns:1fr 384px;min-height:0}
   #map{height:100%}
-  /* basemap toggle (top right over map, weather app style) */
-  .basemap{position:absolute;top:14px;right:388px;z-index:5;display:flex;flex-direction:column;
-    background:rgba(22,27,34,.9);border:1px solid var(--border);border-radius:9px;overflow:hidden;
-    backdrop-filter:blur(8px)}
-  .basemap button{border:0;background:transparent;color:var(--muted);font-family:var(--font);
-    font-size:11px;font-weight:600;padding:8px 12px;cursor:pointer}
+  .basemap{position:absolute;top:14px;right:400px;z-index:5;display:flex;flex-direction:column;background:rgba(22,27,34,.9);border:1px solid var(--border);border-radius:9px;overflow:hidden;backdrop-filter:blur(8px)}
+  .basemap button{border:0;background:transparent;color:var(--muted);font-family:var(--font);font-size:11px;font-weight:600;padding:8px 12px;cursor:pointer}
   .basemap button.on{background:#243049;color:var(--text)}
-  aside{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:16px;padding-bottom:130px}
-  aside::-webkit-scrollbar{width:8px}
-  aside::-webkit-scrollbar-thumb{background:#262d38;border-radius:4px}
-  .sec{margin-bottom:18px}
-  .sec h2{font-family:var(--display);font-size:11px;letter-spacing:.9px;text-transform:uppercase;
-    color:var(--muted);font-weight:600;margin:0 0 10px}
+  aside{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:16px;padding-bottom:128px}
+  aside::-webkit-scrollbar{width:8px}aside::-webkit-scrollbar-thumb{background:#262d38;border-radius:4px}
+  .sec{margin-bottom:17px}
+  .sec h2{font-family:var(--display);font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .card{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px}
   .card .v{font-family:var(--display);font-size:21px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
-  .card .l{font-size:10.5px;color:var(--muted);margin-top:3px;letter-spacing:.2px}
+  .card .l{font-size:10.5px;color:var(--muted);margin-top:3px}
+  /* scenario chips */
+  .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .chip{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:#3b4654}
+  .chip.on{border-color:var(--accent);background:#142235}
+  .chip .ic{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex:none}
+  .chip .t{font-size:12px;font-weight:600;line-height:1.15}
+  .chip .d{font-size:9.5px;color:var(--faint);margin-top:1px}
+  .scendesc{font-size:11px;color:var(--faint);line-height:1.5;margin-top:9px}
+  /* impact readouts */
+  .readouts{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .ro{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:10px 11px}
+  .ro .v{font-family:var(--display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;transition:color .2s}
+  .ro .l{font-size:9.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+  .spark{margin-top:12px;height:54px;display:flex;align-items:flex-end;gap:2px}
+  .spark .b{flex:1;border-radius:2px 2px 0 0;background:#22304a;transition:height .12s}
   .toggle{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px}
-  .toggle button{flex:1;border:0;background:transparent;color:var(--muted);font-family:var(--font);
-    font-size:12px;font-weight:600;padding:7px;border-radius:6px;cursor:pointer;transition:.15s}
+  .toggle button{flex:1;border:0;background:transparent;color:var(--muted);font-family:var(--font);font-size:12px;font-weight:600;padding:7px;border-radius:6px;cursor:pointer}
   .toggle button.on{background:#243049;color:var(--text)}
   .legend{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:9px}
   .ramp{flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--amber),var(--red))}
-  .readouts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
-  .ro{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center}
-  .ro .v{font-family:var(--display);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
-  .ro .l{font-size:9.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
-  .chart{margin-top:13px;height:64px;display:flex;align-items:flex-end;gap:2px}
-  .bar{flex:1;border-radius:2px 2px 0 0;transition:.1s}
-  .bar.cur{outline:1.5px solid var(--accent)}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-right:14px}
   .dot{width:9px;height:9px;border-radius:50%}
+  .gk{display:flex;align-items:center;gap:8px;font-size:11px;margin:5px 0}
+  .gk .rank{color:var(--faint);width:14px}
+  .gk .bar{flex:1;height:6px;border-radius:3px;background:#222b38;overflow:hidden}
+  .gk .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--red))}
+  .gk .val{color:var(--muted);font-variant-numeric:tabular-nums;width:34px;text-align:right}
   .note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:8px}
   .foot{font-size:10.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:11px;line-height:1.6}
-  /* bottom timeline bar (weather app style) */
-  .timeline{position:absolute;left:24px;right:396px;bottom:20px;z-index:6;display:flex;align-items:center;
-    gap:16px;padding:14px 18px;border-radius:16px;background:rgba(18,23,31,.86);
-    border:1px solid var(--border);backdrop-filter:blur(12px);box-shadow:0 8px 30px #0007}
-  .play{width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#243049;color:var(--text);
-    cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .play svg{width:18px;height:18px}
+  /* timeline */
+  .timeline{position:absolute;left:24px;right:408px;bottom:20px;z-index:6;display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:16px;background:rgba(18,23,31,.88);border:1px solid var(--border);backdrop-filter:blur(12px);box-shadow:0 8px 30px #0007}
+  .play{width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#243049;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .play:hover{background:#2c3a52}.play svg{width:18px;height:18px}
   .tl-body{flex:1;min-width:0}
   .tl-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;white-space:nowrap}
-  .tl-title{font-family:var(--display);font-weight:600;font-size:14px;flex:none}
+  .tl-title{font-family:var(--display);font-weight:600;font-size:14px;flex:none;display:flex;align-items:center;gap:8px}
   .tl-sub{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;min-width:0}
-  .tl-state{margin-left:auto;font-size:11.5px;color:var(--blue);font-weight:600;flex:none}
+  .tl-state{margin-left:auto;font-size:11.5px;font-weight:600;flex:none}
   .track{position:relative;height:6px;border-radius:3px;background:#222a36;cursor:pointer}
-  .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;
-    background:linear-gradient(90deg,#2f81f7,#58a6ff)}
-  .track .head{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;
-    border:3px solid var(--blue);transform:translate(-50%,-50%);box-shadow:0 1px 4px #0008}
+  .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#2f81f7,#58a6ff)}
+  .track .head{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--blue);transform:translate(-50%,-50%);box-shadow:0 1px 4px #0008;transition:left .05s linear}
   .ticks{display:flex;justify-content:space-between;margin-top:8px;font-size:10.5px;color:var(--faint)}
-  /* keep panel, basemap toggle and timeline aligned as the window narrows */
-  @media (max-width:1240px){
-    main{grid-template-columns:1fr 320px}
-    .basemap{right:332px}
-    .timeline{right:340px;left:18px}
-    aside{padding:13px;padding-bottom:120px}
-  }
-  @media (max-width:1000px){
-    main{grid-template-columns:1fr 280px}
-    .basemap{right:292px}
-    .timeline{right:300px;left:14px;padding:11px 14px}
-    .tl-sub{display:none}
-    .card .v{font-size:18px}
-  }
+  .maplibregl-popup-content{background:#12161f;color:var(--text);border:1px solid var(--border);border-radius:9px;font-family:var(--font);font-size:11.5px;padding:10px 12px;box-shadow:0 6px 22px #0008}
+  .maplibregl-popup-tip{border-top-color:#12161f!important;border-bottom-color:#12161f!important}
+  .pop b{font-family:var(--display);font-size:13px}.pop .row{color:var(--muted);margin-top:3px}
+  @media (max-width:1240px){main{grid-template-columns:1fr 330px}.basemap{right:346px}.timeline{right:354px;left:18px}}
+  @media (max-width:1000px){main{grid-template-columns:1fr 288px}.basemap{right:302px}.timeline{right:308px;left:14px}.tl-sub{display:none}}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
     <div class="brand">
-      <svg width="18" height="18" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="0" y="0" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="5" y="0" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="10" y="0" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="15" y="0" width="4" height="4" rx="0.5" fill="#5a7d8a"/>
-        <rect x="0" y="5" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="5" y="5" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="10" y="5" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="15" y="5" width="4" height="4" rx="0.5" fill="#5a7d8a"/>
-        <rect x="0" y="10" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="5" y="10" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="10" y="10" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="15" y="10" width="4" height="4" rx="0.5" fill="#5a7d8a"/>
-        <rect x="0" y="15" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="5" y="15" width="4" height="4" rx="0.5" fill="#5a7d8a"/><rect x="10" y="15" width="4" height="4" rx="0.5" fill="#5a7d8a"/>
-        <circle cx="17" cy="17" r="2.4" fill="#c45a5a"/>
-      </svg>
-      SatMesh
+      <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="0" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/>
+        <rect x="0" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/>
+        <rect x="0" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/>
+        <rect x="0" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><circle cx="17" cy="17" r="2.4" fill="#c45a5a"/>
+      </svg> SatMesh
     </div>
     <span class="tag">ISRO BAH 2026 · PS4 · ROUTE RESILIENCE</span>
+    <span class="live"><span class="blip"></span>LIVE GRAPH ENGINE</span>
     <div class="spacer"></div>
     <div class="src">City <b id="cityName">Bengaluru</b> &nbsp;·&nbsp; Data <b>OpenStreetMap + SRTM Terrarium</b></div>
   </header>
   <main>
     <div id="map"></div>
+    <div class="basemap"><button id="bDark" class="on">Dark</button><button id="bSat">Satellite</button></div>
 
-    <div class="basemap">
-      <button id="bDark" class="on">Dark</button>
-      <button id="bSat">Satellite</button>
-    </div>
-
-    <!-- bottom timeline / forecast bar -->
     <div class="timeline">
-      <button class="play" id="play" title="Play flood timeline">
-        <svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
-      </button>
+      <button class="play" id="play" title="Run scenario"><svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
       <div class="tl-body">
         <div class="tl-head">
-          <span class="tl-title">Flood Simulation</span>
-          <span class="tl-sub">Monsoon cloudburst · Bengaluru core</span>
-          <span class="tl-state" id="tlState">Water level 873 m</span>
+          <span class="tl-title"><span id="tlDot" class="dot" style="background:var(--blue)"></span><span id="tlTitle">Monsoon Flood</span></span>
+          <span class="tl-sub" id="tlSub">Cloudburst, water rising by elevation</span>
+          <span class="tl-state" id="tlState" style="color:var(--blue)">stage 0</span>
         </div>
         <div class="track" id="track"><div class="fill" id="fill"></div><div class="head" id="head"></div></div>
         <div class="ticks" id="ticks"></div>
@@ -150,168 +130,238 @@
         <div class="grid">
           <div class="card"><div class="v" id="mNodes">0</div><div class="l">Intersections</div></div>
           <div class="card"><div class="v" id="mEdges">0</div><div class="l">Road segments</div></div>
-          <div class="card"><div class="v" id="mGate">0</div><div class="l">Gatekeeper nodes</div></div>
-          <div class="card"><div class="v" id="mFC">0</div><div class="l">Flood critical assets</div></div>
         </div>
+      </div>
+
+      <div class="sec">
+        <h2>Stress test scenario</h2>
+        <div class="chips" id="chips"></div>
+        <div class="scendesc" id="scendesc"></div>
+      </div>
+
+      <div class="sec">
+        <h2>Live impact</h2>
+        <div class="readouts">
+          <div class="ro"><div class="v" id="rLost" style="color:var(--blue)">0%</div><div class="l">Roads lost</div></div>
+          <div class="ro"><div class="v" id="rConn">100%</div><div class="l">Connectivity</div></div>
+          <div class="ro"><div class="v" id="rIso">0</div><div class="l">Isolated zones</div></div>
+          <div class="ro"><div class="v" id="rRes" style="color:var(--green)">1.00</div><div class="l">Resilience Idx</div></div>
+        </div>
+        <div class="spark" id="spark"></div>
+        <div class="note" id="impnote">Run a scenario: the live graph engine recomputes connectivity and the Resilience Index as roads fail. Lower means more vulnerable.</div>
       </div>
 
       <div class="sec">
         <h2>Map layer</h2>
-        <div class="toggle">
-          <button id="vCrit" class="on">Criticality Worth</button>
-          <button id="vFlood">Flood view</button>
-        </div>
+        <div class="toggle"><button id="vCrit" class="on">Criticality Worth</button><button id="vScen">Scenario impact</button></div>
         <div class="legend"><span>Low</span><div class="ramp"></div><span>High</span></div>
-        <div class="note">Criticality Worth uses betweenness centrality. Red links are single points of
-          failure. Disabling one fragments routing the most.</div>
       </div>
 
       <div class="sec">
-        <h2>Live resilience</h2>
-        <div class="readouts">
-          <div class="ro"><div class="v" id="rSub" style="color:var(--blue)">0%</div><div class="l">Submerged</div></div>
-          <div class="ro"><div class="v" id="rConn">100%</div><div class="l">Connectivity</div></div>
-          <div class="ro"><div class="v" id="rRes" style="color:var(--green)">1.00</div><div class="l">Resilience Idx</div></div>
-        </div>
-        <div class="chart" id="chart"></div>
-        <div class="note">As the timeline plays, rising water submerges low elevation roads (real SRTM).
-          The network fragments and the Resilience Index falls. Lower means more vulnerable.</div>
+        <h2>Top gatekeeper nodes</h2>
+        <div id="gklist"></div>
       </div>
 
       <div class="sec">
-        <div class="pill"><span class="dot" style="background:var(--red)"></span>Gatekeeper node</div>
-        <div class="pill"><span class="dot" style="background:var(--blue)"></span>Flood critical</div>
+        <span class="pill"><span class="dot" style="background:var(--red)"></span>Gatekeeper</span>
+        <span class="pill"><span class="dot" style="background:var(--blue)"></span>Flood critical</span>
       </div>
-
       <div class="foot" id="foot">Loading real Bengaluru network.</div>
     </aside>
   </main>
 </div>
 
 <script>
-const C={green:'#3fb950',amber:'#d29922',red:'#f85149',blue:'#2f81f7',dim:'#3a4350'};
+const C={green:'#3fb950',amber:'#d29922',red:'#f85149',blue:'#2f81f7',orange:'#f0883e',dim:'#39424f'};
 const DARK='https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const SAT={version:8,sources:{sat:{type:'raster',
-  tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-  tileSize:256,attribution:'Esri World Imagery'}},
-  layers:[{id:'sat',type:'raster',source:'sat'}]};
-
-function critColor(t){
-  const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));
-  const g=[63,185,80],a=[210,153,34],r=[248,81,73];
-  const c=t<0.5?lerp(g,a,t/0.5):lerp(a,r,(t-0.5)/0.5);
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
-}
+const SAT={version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'Esri'}},layers:[{id:'sat',type:'raster',source:'sat'}]};
+function critColor(t){const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));const g=[63,185,80],a=[210,153,34],r=[248,81,73];const c=t<0.5?lerp(g,a,t/.5):lerp(a,r,(t-.5)/.5);return`rgb(${c[0]},${c[1]},${c[2]})`;}
 
 const map=new maplibregl.Map({container:'map',style:DARK,center:[77.590,12.978],zoom:13.2,attributionControl:false});
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-left');
 
-let DATA,edgeFC,ptsFC,curve,elevMin,elevMax,curLevel,view='crit';
-const STEPS=48;                       // timeline resolution
-const T0=18*60;                       // event starts 6:00 PM (minutes)
-const DUR=12*60;                      // 12 hour event
+let DATA,edgeFC,ptsFC,nodeById={},adj=new Map(),adjW=new Map(),critRank={},elevMin,elevMax,floodMax,baseEff=1,scen='flood',view='crit',curFrac=0,epi=null;
+const STEPS=60;
+class MinHeap{constructor(){this.a=[]}get size(){return this.a.length}
+ push(k,v){const a=this.a;a.push([k,v]);let i=a.length-1;while(i>0){const p=(i-1)>>1;if(a[p][0]<=a[i][0])break;[a[p],a[i]]=[a[i],a[p]];i=p;}}
+ pop(){const a=this.a,top=a[0],last=a.pop();if(a.length){a[0]=last;let i=0;for(;;){let l=2*i+1,r=l+1,m=i;if(l<a.length&&a[l][0]<a[m][0])m=l;if(r<a.length&&a[r][0]<a[m][0])m=r;if(m===i)break;[a[m],a[i]]=[a[i],a[m]];i=m;}}return top;}}
+
+// scenario definitions: each maps a timeline fraction -> a set of failed nodes,
+// plus per-edge scalar field + threshold for fast map painting.
+const SCEN={
+  flood:{name:'Monsoon Flood',sub:'Cloudburst, water rising by elevation',color:C.blue,
+    desc:'Water rises by real SRTM elevation. Low lying roads submerge first and the network fragments from the bottom up.',
+    field:'minElev',thr:f=>elevMin+f*(floodMax-elevMin),op:'<=',
+    dead:f=>{const w=elevMin+f*(floodMax-elevMin);return id=>nodeById[id].elev<=w;},
+    state:f=>'Water '+(elevMin+f*(floodMax-elevMin)).toFixed(0)+' m',
+    tick:f=>clock(18*60+12*60*f)},
+  quake:{name:'Earthquake',sub:'Shaking radiates from the epicentre',color:C.orange,
+    desc:'Ground shaking radiates outward from an epicentre (click the map to move it). Roads inside the damage radius fail.',
+    field:'epiDist',thr:f=>f*maxR(),op:'<=',
+    dead:f=>{const r=f*maxR();return id=>nodeById[id].epiDist<=r;},
+    state:f=>'Radius '+(f*maxR()/1000).toFixed(1)+' km',
+    tick:f=>'T+'+Math.round(f*90)+'s'},
+  gate:{name:'Gatekeeper Collapse',sub:'Most critical intersections fail',color:C.red,
+    desc:'The highest betweenness intersections fail one by one. These gatekeepers carry the most routes, so the network collapses fast.',
+    field:'gateRank',thr:f=>Math.round(f*GMAX),op:'<',
+    dead:f=>{const k=Math.round(f*GMAX);return id=>critRank[id]<k;},
+    state:f=>Math.round(f*GMAX)+' nodes down',
+    tick:f=>Math.round(f*GMAX)+''},
+  accident:{name:'Major Accident',sub:'Arterial corridor blocked',color:C.amber,
+    desc:'A blockage spreads along the busiest arterial corridor (congestion backing up). A localised but high traffic failure.',
+    field:'accDist',thr:f=>f*ACCR,op:'<=',
+    dead:f=>{const r=f*ACCR;return id=>nodeById[id].accDist<=r;},
+    state:f=>(f*100).toFixed(0)+'% corridor',
+    tick:f=>(f*100).toFixed(0)+'%'}
+};
+const GMAX=280, ACCR=1700;
+function maxR(){return DATA?DATA._diag*0.55:3000;}
+function clock(min){let h=Math.floor(min/60)%24,m=Math.round(min)%60;const ap=h>=12?'PM':'AM';let hh=h%12||12;return`${hh}:${String(m).padStart(2,'0')} ${ap}`;}
+function mDist(a,b){const la=(a.lat+b.lat)/2*Math.PI/180;const dx=(a.lon-b.lon)*Math.cos(la),dy=a.lat-b.lat;return Math.sqrt(dx*dx+dy*dy)*111000;}
 
 fetch('resilience.json').then(r=>r.json()).then(d=>{
-  DATA=d;curve=d.flood_curve;const m=d.metrics;
-  cityName.textContent=d.city;
-  mNodes.textContent=m.n_nodes.toLocaleString();
-  mEdges.textContent=m.n_edges.toLocaleString();
-  mGate.textContent=m.gatekeeper_count;
-  mFC.textContent=m.flood_critical_count;
-  elevMin=m.elev_min_m;elevMax=m.elev_max_m;
-  foot.innerHTML=`Real OpenStreetMap drive network. Per node SRTM elevation `
-    +`${m.elev_min_m} to ${m.elev_max_m} m. Betweenness centrality. `
-    +`${m.n_nodes.toLocaleString()} nodes, ${m.n_edges.toLocaleString()} edges. No synthetic data.`;
-
-  const nd={};d.nodes.forEach(n=>nd[n.id]=n);
-  edgeFC={type:'FeatureCollection',features:d.edges.map(e=>{
-    const a=nd[e.s],b=nd[e.t];
-    return{type:'Feature',geometry:{type:'LineString',coordinates:e.coords},
-      properties:{crit:Math.max(a.crit,b.crit),minElev:Math.min(a.elev,b.elev),color:critColor(Math.max(a.crit,b.crit))}};
-  })};
-  ptsFC={type:'FeatureCollection',features:d.nodes.filter(n=>n.gatekeeper||n.flood_critical)
-    .map(n=>({type:'Feature',geometry:{type:'Point',coordinates:[n.lon,n.lat]},
-      properties:{kind:n.flood_critical?'flood':'gate'}}))};
-
-  buildChart();buildTicks();
+  DATA=d;const m=d.metrics;
+  cityName.textContent=d.city;mNodes.textContent=m.n_nodes.toLocaleString();mEdges.textContent=m.n_edges.toLocaleString();
+  elevMin=m.elev_min_m;elevMax=m.elev_max_m;floodMax=elevMin+(elevMax-elevMin)*0.92;
+  d.nodes.forEach(n=>{nodeById[n.id]=n;adj.set(n.id,[]);adjW.set(n.id,[]);});
+  d.edges.forEach(e=>{if(adj.has(e.s)&&adj.has(e.t)){adj.get(e.s).push(e.t);adj.get(e.t).push(e.s);
+    const w=e.len||1;adjW.get(e.s).push([e.t,w]);adjW.get(e.t).push([e.s,w]);}});
+  // criticality rank (0 = most critical)
+  const sorted=[...d.nodes].sort((a,b)=>b.crit-a.crit);sorted.forEach((n,i)=>critRank[n.id]=i);
+  // bbox diagonal for quake radius
+  const bb=d.bbox;DATA._diag=mDist({lat:bb[0],lon:bb[1]},{lat:bb[2],lon:bb[3]});
+  // default epicentre = geographic centre; accident corridor = top gatekeeper
+  epi={lat:(bb[0]+bb[2])/2,lon:(bb[1]+bb[3])/2};
+  const topGate=sorted[0];window._acc=topGate;
+  computeDistances();
+  edgeFC={type:'FeatureCollection',features:d.edges.map(e=>{const a=nodeById[e.s],b=nodeById[e.t];
+    return{type:'Feature',geometry:{type:'LineString',coordinates:e.coords},properties:{
+      crit:Math.max(a.crit,b.crit),color:critColor(Math.max(a.crit,b.crit)),len:e.len,
+      minElev:Math.min(a.elev,b.elev),gateRank:Math.min(critRank[e.s],critRank[e.t]),
+      epiDist:Math.min(a.epiDist,b.epiDist),accDist:Math.min(a.accDist,b.accDist)}};})};
+  ptsFC={type:'FeatureCollection',features:d.nodes.filter(n=>n.gatekeeper||n.flood_critical).map(n=>({type:'Feature',geometry:{type:'Point',coordinates:[n.lon,n.lat]},properties:{kind:n.flood_critical?'flood':'gate'}}))};
+  foot.innerHTML=`Real OpenStreetMap drive network. Per node SRTM elevation ${m.elev_min_m} to ${m.elev_max_m} m. Betweenness centrality. ${m.n_nodes.toLocaleString()} nodes, ${m.n_edges.toLocaleString()} edges. No synthetic data.`;
+  baseEff=efficiency(()=>false);
+  buildChips();buildGK(sorted);buildSpark();
+  selectScen('flood');
   if(map.isStyleLoaded())addData();else map.on('load',addData);
-  setLevelPct(0);
 });
+
+function computeDistances(){
+  for(const n of DATA.nodes){
+    n.epiDist=mDist(n,epi);
+    n.accDist=mDist(n,window._acc);
+  }
+}
 
 function addData(){
   if(!edgeFC)return;
   if(!map.getSource('edges'))map.addSource('edges',{type:'geojson',data:edgeFC});
-  if(!map.getLayer('edges'))map.addLayer({id:'edges',type:'line',source:'edges',
-    layout:{'line-cap':'round','line-join':'round'},
-    paint:{'line-color':['get','color'],
-      'line-width':['interpolate',['linear'],['zoom'],11,['+',0.5,['*',2.5,['get','crit']]],15,['+',1.2,['*',4.5,['get','crit']]]],
-      'line-opacity':0.92}});
+  if(!map.getLayer('edges'))map.addLayer({id:'edges',type:'line',source:'edges',layout:{'line-cap':'round','line-join':'round'},
+    paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],11,['+',.5,['*',2.5,['get','crit']]],15,['+',1.2,['*',4.5,['get','crit']]]],'line-opacity':.92}});
   if(!map.getSource('pts'))map.addSource('pts',{type:'geojson',data:ptsFC});
-  if(!map.getLayer('pts'))map.addLayer({id:'pts',type:'circle',source:'pts',
-    paint:{'circle-radius':['case',['==',['get','kind'],'gate'],5.5,4.5],
-      'circle-color':['case',['==',['get','kind'],'gate'],C.red,C.blue],
-      'circle-stroke-width':1.5,'circle-stroke-color':'#0d1117'}});
+  if(!map.getLayer('pts'))map.addLayer({id:'pts',type:'circle',source:'pts',paint:{'circle-radius':['case',['==',['get','kind'],'gate'],5.5,4.5],'circle-color':['case',['==',['get','kind'],'gate'],C.red,C.blue],'circle-stroke-width':1.5,'circle-stroke-color':'#0d1117'}});
+  if(!map.getSource('epi'))map.addSource('epi',{type:'geojson',data:epiFC()});
+  if(!map.getLayer('epi'))map.addLayer({id:'epi',type:'circle',source:'epi',paint:{'circle-radius':6,'circle-color':C.orange,'circle-stroke-width':2,'circle-stroke-color':'#fff','circle-opacity':0}});
+  map.on('click','edges',e=>{const p=e.features[0].properties;new maplibregl.Popup({closeButton:false,offset:8}).setLngLat(e.lngLat).setHTML(
+    `<div class="pop"><b>Road segment</b><div class="row">Criticality Worth ${(+p.crit).toFixed(2)}</div><div class="row">Min elevation ${(+p.minElev).toFixed(0)} m</div><div class="row">Length ${(+p.len).toFixed(0)} m</div></div>`).addTo(map);});
+  map.on('mouseenter','edges',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','edges',()=>map.getCanvas().style.cursor='');
+  map.on('click',e=>{if(scen!=='quake')return;epi={lat:e.lngLat.lat,lon:e.lngLat.lng};computeDistances();refreshEdgeFields();map.getSource('epi').setData(epiFC());setFrac(curFrac);});
   applyPaint();
 }
+function epiFC(){return{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[epi.lon,epi.lat]},properties:{}}]};}
+function refreshEdgeFields(){edgeFC.features.forEach(f=>{});DATA.edges.forEach((e,i)=>{const a=nodeById[e.s],b=nodeById[e.t];edgeFC.features[i].properties.epiDist=Math.min(a.epiDist,b.epiDist);edgeFC.features[i].properties.accDist=Math.min(a.accDist,b.accDist);});if(map.getSource('edges'))map.getSource('edges').setData(edgeFC);}
 
-/* basemap toggle */
-bDark.onclick=()=>setBase('dark');
-bSat.onclick=()=>setBase('sat');
-function setBase(b){
-  bDark.classList.toggle('on',b==='dark');bSat.classList.toggle('on',b==='sat');
-  map.setStyle(b==='dark'?DARK:SAT);
-  map.once('styledata',()=>setTimeout(addData,120));
+/* basemap + view toggles */
+bDark.onclick=()=>setBase('dark');bSat.onclick=()=>setBase('sat');
+function setBase(b){bDark.classList.toggle('on',b==='dark');bSat.classList.toggle('on',b==='sat');map.setStyle(b==='dark'?DARK:SAT);map.once('styledata',()=>setTimeout(addData,140));}
+vCrit.onclick=()=>{view='crit';vCrit.classList.add('on');vScen.classList.remove('on');applyPaint();};
+vScen.onclick=()=>{view='scen';vScen.classList.add('on');vCrit.classList.remove('on');applyPaint();};
+
+/* scenarios */
+function buildChips(){
+  const icons={flood:['🌊',C.blue],quake:['⊕',C.orange],gate:['◆',C.red],accident:['▣',C.amber]};
+  chips.innerHTML='';
+  for(const k of Object.keys(SCEN)){const s=SCEN[k],[ic,col]=icons[k];
+    const el=document.createElement('div');el.className='chip'+(k===scen?' on':'');el.dataset.k=k;
+    el.innerHTML=`<div class="ic" style="background:${col}22;color:${col};font-size:13px">${ic}</div><div><div class="t">${s.name}</div><div class="d">${s.sub}</div></div>`;
+    el.onclick=()=>selectScen(k);chips.appendChild(el);}
 }
+function selectScen(k){
+  scen=k;pause();const s=SCEN[k];
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.k===k));
+  tlTitle.textContent=s.name;tlSub.textContent=s.sub;tlDot.style.background=s.color;
+  tlState.style.color=s.color;document.querySelector('.fill').style.background=`linear-gradient(90deg,${s.color}99,${s.color})`;
+  document.querySelector('.head').style.borderColor=s.color;
+  scendesc.textContent=s.desc;
+  map.setPaintProperty&&map.getLayer('epi')&&map.setPaintProperty('epi','circle-opacity',k==='quake'?.9:0);
+  buildTicks();view='scen';vScen.classList.add('on');vCrit.classList.remove('on');
+  setFrac(0);
+}
+function buildTicks(){ticks.innerHTML='';const s=SCEN[scen];for(let i=0;i<=4;i++){const sp=document.createElement('span');sp.textContent=s.tick(i/4);ticks.appendChild(sp);}}
 
-/* layer view */
-vCrit.onclick=()=>setView('crit');
-vFlood.onclick=()=>setView('flood');
-function setView(v){view=v;vCrit.classList.toggle('on',v==='crit');vFlood.classList.toggle('on',v==='flood');applyPaint();}
-function applyPaint(){
-  if(!map.getLayer('edges'))return;
-  if(view==='flood'){
-    map.setPaintProperty('edges','line-color',['case',['<=',['get','minElev'],curLevel],C.blue,C.dim]);
-    map.setPaintProperty('edges','line-opacity',['case',['<=',['get','minElev'],curLevel],0.95,0.32]);
-  }else{
-    map.setPaintProperty('edges','line-color',['get','color']);
-    map.setPaintProperty('edges','line-opacity',0.92);
+/* live graph engine */
+function efficiency(isDead){ // sampled weighted (road-length) global efficiency; ratio to baseline = Resilience Index
+  const liveSet=new Set();for(const n of DATA.nodes)if(!isDead(n.id))liveSet.add(n.id);
+  if(liveSet.size<2)return 0;
+  const live=[...liveSet];let srcs=[];for(let i=0;i<Math.min(24,live.length);i++)srcs.push(live[(i*1303)%live.length]);
+  const Nm1=DATA.nodes.length-1;let tot=0;
+  for(const s of srcs){
+    const dist=new Map([[s,0]]);const h=new MinHeap();h.push(0,s);
+    while(h.size){const[du,u]=h.pop();if(du>dist.get(u))continue;
+      for(const[v,w]of adjW.get(u)){if(!liveSet.has(v))continue;const nd=du+w;if(nd<(dist.get(v)??Infinity)){dist.set(v,nd);h.push(nd,v);}}}
+    for(const[t,dm]of dist){if(t!==s&&dm>0)tot+=1/dm;}
   }
+  return tot/srcs.length/Nm1;
+}
+function components(isDead){ // largest comp fraction + isolated comp count
+  const seen=new Set();let lcc=0,iso=0;
+  for(const n of DATA.nodes){const id=n.id;if(isDead(id)||seen.has(id))continue;
+    let sz=0;const q=[id];seen.add(id);let qi=0;
+    while(qi<q.length){const u=q[qi++];sz++;for(const v of adj.get(u)){if(isDead(v)||seen.has(v))continue;seen.add(v);q.push(v);}}
+    if(sz>lcc)lcc=sz;if(sz>=3)iso++;}
+  return{lccFrac:lcc/DATA.nodes.length,iso:Math.max(0,iso-1)};
 }
 
 /* timeline */
-function fmtClock(min){let h=Math.floor(min/60)%24,m=min%60;const ap=h>=12?'PM':'AM';let hh=h%12;if(hh===0)hh=12;return `${hh}:${String(m).padStart(2,'0')} ${ap}`;}
-function buildTicks(){const t=document.getElementById('ticks');t.innerHTML='';
-  for(let i=0;i<=4;i++){const s=document.createElement('span');s.textContent=fmtClock(T0+DUR*i/4);t.appendChild(s);}}
-function setLevelPct(pct){
-  pct=Math.max(0,Math.min(100,pct));
-  curLevel=elevMin+(elevMax-elevMin)*(pct/100);
-  let row=curve[0];for(const r of curve)if(r.level_m<=curLevel)row=r;
-  rSub.textContent=Math.round(row.flooded_frac*100)+'%';
-  rConn.textContent=Math.round(row.lcc_frac*100)+'%';
-  const res=row.resilience;rRes.textContent=res.toFixed(2);
-  rRes.style.color=res>0.7?C.green:res>0.4?C.amber:C.red;
-  document.getElementById('fill').style.width=pct+'%';
-  document.getElementById('head').style.left=pct+'%';
-  tlState.textContent='Water level '+curLevel.toFixed(0)+' m';
-  document.querySelectorAll('.bar').forEach((b,i)=>b.classList.toggle('cur',
-    curve[i].level_m<=curLevel&&(i===curve.length-1||curve[i+1].level_m>curLevel)));
+let playing=false,timer=null,sparkVals=[];
+play.onclick=()=>playing?pause():run();
+function run(){playing=true;if(view!=='scen'){view='scen';vScen.classList.add('on');vCrit.classList.remove('on');}
+  playIcon.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';if(curFrac>=1)setFrac(0);
+  timer=setInterval(()=>{let f=curFrac+1/STEPS;if(f>=1){f=1;setFrac(f);pause();}else setFrac(f);},150);}
+function pause(){playing=false;clearInterval(timer);playIcon.innerHTML='<path d="M8 5v14l11-7z"/>';}
+track.onclick=e=>{pause();const r=e.currentTarget.getBoundingClientRect();setFrac((e.clientX-r.left)/r.width);};
+
+function setFrac(f){
+  f=Math.max(0,Math.min(1,f));curFrac=f;const s=SCEN[scen];
+  document.getElementById('fill').style.width=(f*100)+'%';document.getElementById('head').style.left=(f*100)+'%';
+  tlState.textContent=s.state(f);
+  const isDead=s.dead(f);
+  const cmp=components(isDead);const eff=efficiency(isDead);const res=baseEff?eff/baseEff:0;
+  const lostN=DATA.nodes.filter(n=>isDead(n.id)).length;const lost=lostN/DATA.nodes.length;
+  setRO('rLost',Math.round(lost*100)+'%',s.color);
+  setRO('rConn',Math.round(cmp.lccFrac*100)+'%',cmp.lccFrac>.7?C.green:cmp.lccFrac>.4?C.amber:C.red);
+  setRO('rIso',cmp.iso,cmp.iso>6?C.red:cmp.iso>2?C.amber:C.text);
+  setRO('rRes',res.toFixed(2),res>.7?C.green:res>.4?C.amber:C.red);
+  const step=Math.round(f*(STEPS-1));sparkVals[step]=res;drawSpark(step);
   applyPaint();
 }
-let playing=false,timer=null,step=0;
-const playIcon=document.getElementById('playIcon');
-document.getElementById('play').onclick=()=>playing?pause():play();
-function play(){playing=true;if(view!=='flood')setView('flood');
-  playIcon.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
-  if(step>=STEPS)step=0;
-  timer=setInterval(()=>{step++;setLevelPct(step/STEPS*100);if(step>=STEPS)pause();},220);}
-function pause(){playing=false;clearInterval(timer);playIcon.innerHTML='<path d="M8 5v14l11-7z"/>';}
-document.getElementById('track').onclick=(e)=>{pause();const r=e.currentTarget.getBoundingClientRect();
-  const pct=(e.clientX-r.left)/r.width*100;step=Math.round(pct/100*STEPS);setLevelPct(pct);};
+function setRO(id,v,c){const e=document.getElementById(id);e.textContent=v;if(c)e.style.color=c;}
+function buildSpark(){spark.innerHTML='';sparkVals=new Array(STEPS).fill(null);for(let i=0;i<STEPS;i++){const b=document.createElement('div');b.className='b';b.style.height='4%';spark.appendChild(b);}}
+function drawSpark(cur){const bars=spark.children;for(let i=0;i<STEPS;i++){const v=sparkVals[i];if(v==null){bars[i].style.height='4%';bars[i].style.background='#1b2433';continue;}bars[i].style.height=(6+v*100*.5)+'%';bars[i].style.background=i===cur?C.accent:(v>.7?'#234a33':v>.4?'#3d3722':'#45272a');}}
 
-function buildChart(){const el=document.getElementById('chart');el.innerHTML='';
-  curve.forEach(r=>{const b=document.createElement('div');b.className='bar';
-    b.style.height=(8+r.resilience*100*0.55)+'%';
-    b.style.background=r.resilience>0.7?'#234a33':r.resilience>0.4?'#3d3722':'#45272a';el.appendChild(b);});}
+function applyPaint(){
+  if(!map.getLayer('edges'))return;const s=SCEN[scen];
+  if(view==='crit'){map.setPaintProperty('edges','line-color',['get','color']);map.setPaintProperty('edges','line-opacity',.92);return;}
+  const thr=s.thr(curFrac);const dead=[s.op,['get',s.field],thr];
+  map.setPaintProperty('edges','line-color',['case',dead,s.color,C.dim]);
+  map.setPaintProperty('edges','line-opacity',['case',dead,.96,.34]);
+}
+
+function buildGK(sorted){gklist.innerHTML='';const top=sorted.slice(0,6);const mx=top[0].crit||1;
+  top.forEach((n,i)=>{const el=document.createElement('div');el.className='gk';
+    el.innerHTML=`<span class="rank">${i+1}</span><span class="bar"><i style="width:${(n.crit/mx*100).toFixed(0)}%"></i></span><span class="val">${n.crit.toFixed(2)}</span>`;gklist.appendChild(el);});}
 </script>
 </body>
 </html>
