@@ -19,6 +19,30 @@ def build_segformer(pretrained=True, in_channels=3, encoder_name="mit_b0"):
 _PATCH1_KEY = "encoder.patch_embed1.proj.weight"
 
 
+def build_segformer_multiclass(num_classes=4, checkpoint_binary=None,
+                               device="cpu", encoder_name="mit_b0"):
+    """SegFormer with num_classes output channels for semantic segmentation.
+
+    If checkpoint_binary is given (a 1-class binary road model), transfers all
+    encoder + decoder weights and reinitialises the segmentation head randomly.
+    This gives a warm encoder start without shape mismatch on the head.
+    """
+    model = smp.Segformer(
+        encoder_name=encoder_name,
+        encoder_weights=None,
+        in_channels=3,
+        classes=num_classes,
+    )
+    if checkpoint_binary and Path(checkpoint_binary).exists():
+        state = torch.load(checkpoint_binary, map_location=device, weights_only=True)
+        # Drop segmentation head keys (shape [1,…] won't match [num_classes,…])
+        state = {k: v for k, v in state.items()
+                 if not k.startswith("segmentation_head")}
+        model.load_state_dict(state, strict=False)
+        print(f"[multiclass] loaded encoder+decoder from {checkpoint_binary}; head reinit")
+    return model
+
+
 def build_segformer_4ch(checkpoint_3ch=None, device="cpu", encoder_name="mit_b0"):
     """Load Stage-1 (3-ch) checkpoint into 4-ch Stage-2 SegFormer.
 
