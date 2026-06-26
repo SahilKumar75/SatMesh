@@ -202,6 +202,8 @@ def main():
     ap.add_argument("--img-size", type=int, default=512)
     ap.add_argument("--resume",   default=None,
                     help="binary 1-class checkpoint to warm-start encoder from")
+    ap.add_argument("--resume-training", default=None, metavar="STATE",
+                    help="training state file (.pt) saved by a previous interrupted run")
     ap.add_argument("--subset",   type=int, default=None,
                     help="limit training samples (for quick sanity checks)")
     args = ap.parse_args()
@@ -242,8 +244,22 @@ def main():
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     best_road_iou = 0.0
+    start_epoch   = 1
+    state_path    = Path(args.out).with_suffix(".training_state.pt")
 
-    for epoch in range(1, args.epochs + 1):
+    # Resume interrupted training (optimizer + scheduler + epoch state)
+    if args.resume_training and Path(args.resume_training).exists():
+        ckpt = torch.load(args.resume_training, map_location=device, weights_only=False)
+        m = model.module if hasattr(model, "module") else model
+        m.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
+        scaler.load_state_dict(ckpt["scaler"])
+        best_road_iou = ckpt["best_road_iou"]
+        start_epoch   = ckpt["epoch"] + 1
+        print(f"[resume] epoch {start_epoch}  best_road_iou={best_road_iou:.4f}")
+
+    for epoch in range(start_epoch, args.epochs + 1):
         train_loss = train_epoch(model, train_loader, optimizer, scaler, device)
         scheduler.step()
         val_loss, road_iou, road_recall, miou = validate(model, val_loader, device)
@@ -257,6 +273,16 @@ def main():
             state = model.module.state_dict() if hasattr(model, "module") else model.state_dict()
             torch.save(state, args.out)
             print(f"  ↑ saved (road_iou={best_road_iou:.4f})")
+
+        # Save full training state after every epoch for spot-instance resume
+        torch.save({
+            "epoch":         epoch,
+            "model":         model.module.state_dict() if hasattr(model, "module") else model.state_dict(),
+            "optimizer":     optimizer.state_dict(),
+            "scheduler":     scheduler.state_dict(),
+            "scaler":        scaler.state_dict(),
+            "best_road_iou": best_road_iou,
+        }, state_path)
 
     print(f"\nDone. best road_iou={best_road_iou:.4f}  checkpoint={args.out}")
     print("Next: run inference with src/model/infer.py, extract class-1 mask → heal.py → graph")
