@@ -3,216 +3,518 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SatMesh · Route Resilience · Bengaluru</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><rect x='0' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='0' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='5' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='15' y='10' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='0' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='5' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><rect x='10' y='15' width='4' height='4' rx='0.5' fill='%235a7d8a'/><circle cx='17' cy='17' r='2.2' fill='%23c45a5a'/></svg>" />
+<title>SatMesh Route Resilience Bengaluru</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-  :root{
-    --bg:#0d1117;--panel:#161b22;--panel2:#1c2230;--border:#2a313c;
-    --text:#e6edf3;--muted:#8b949e;--faint:#6e7681;--accent:#58a6ff;
-    --green:#3fb950;--amber:#d29922;--red:#f85149;--blue:#2f81f7;--orange:#f0883e;
-    --radius:10px;--font:'IBM Plex Sans',system-ui,sans-serif;--display:'Space Grotesk',system-ui,sans-serif;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
-  #app{display:grid;grid-template-rows:54px 1fr;height:100vh}
-  header{display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#11161f,#0d1117)}
-  .brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:.3px}
-  .tag{font-family:var(--display);font-size:11px;font-weight:600;color:var(--accent);border:1px solid #213049;background:#0e1b2e;padding:3px 9px;border-radius:6px;letter-spacing:.5px}
-  header .spacer{flex:1}
-  .src{font-size:11.5px;color:var(--faint)}.src b{color:var(--muted);font-weight:500}
-  .live{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--green);font-weight:600;margin-left:14px}
-  .live .blip{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:pulse 1.8s infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}70%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
-  main{position:relative;display:grid;grid-template-columns:1fr 384px;min-height:0}
-  #map{height:100%}
-  .basemap{position:absolute;top:14px;right:400px;z-index:5;display:flex;flex-direction:column;background:rgba(22,27,34,.9);border:1px solid var(--border);border-radius:9px;overflow:hidden;backdrop-filter:blur(8px)}
-  .basemap button{border:0;background:transparent;color:var(--muted);font-family:var(--font);font-size:11px;font-weight:600;padding:8px 12px;cursor:pointer}
-  .basemap button.on{background:#243049;color:var(--text)}
-  aside{border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:16px;padding-bottom:128px}
-  aside::-webkit-scrollbar{width:8px}aside::-webkit-scrollbar-thumb{background:#262d38;border-radius:4px}
-  .sec{margin-bottom:17px}
-  .sec h2{font-family:var(--display);font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-  .card{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px}
-  .card .v{font-family:var(--display);font-size:21px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
-  .card .l{font-size:10.5px;color:var(--muted);margin-top:3px}
-  /* scenario chips */
-  .chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .chip{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer;transition:.15s}
-  .chip:hover{border-color:#3b4654}
-  .chip.on{border-color:var(--accent);background:#142235}
-  .chip .ic{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex:none}
-  .chip .t{font-size:12px;font-weight:600;line-height:1.15}
-  .chip .d{font-size:9.5px;color:var(--faint);margin-top:1px}
-  .scendesc{font-size:11px;color:var(--faint);line-height:1.5;margin-top:9px}
-  /* impact readouts */
-  .readouts{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-  .ro{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:10px 11px}
-  .ro .v{font-family:var(--display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;transition:color .2s}
-  .ro .l{font-size:9.5px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
-  .spark{margin-top:12px;height:54px;display:flex;align-items:flex-end;gap:2px}
-  .spark .b{flex:1;border-radius:2px 2px 0 0;background:#22304a;transition:height .12s}
-  .toggle{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px}
-  .toggle button{flex:1;border:0;background:transparent;color:var(--muted);font-family:var(--font);font-size:12px;font-weight:600;padding:7px;border-radius:6px;cursor:pointer}
-  .toggle button.on{background:#243049;color:var(--text)}
-  .legend{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin-top:9px}
-  .ramp{flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--green),var(--amber),var(--red))}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-right:14px}
-  .dot{width:9px;height:9px;border-radius:50%}
-  .gk{display:flex;align-items:center;gap:8px;font-size:11px;margin:5px 0}
-  .gk .rank{color:var(--faint);width:14px}
-  .gk .bar{flex:1;height:6px;border-radius:3px;background:#222b38;overflow:hidden}
-  .gk .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),var(--red))}
-  .gk .val{color:var(--muted);font-variant-numeric:tabular-nums;width:34px;text-align:right}
-  .note{font-size:11px;color:var(--faint);line-height:1.55;margin-top:8px}
-  .foot{font-size:10.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:11px;line-height:1.6}
-  /* timeline */
-  .timeline{position:absolute;left:24px;right:408px;bottom:20px;z-index:6;display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:16px;background:rgba(18,23,31,.88);border:1px solid var(--border);backdrop-filter:blur(12px);box-shadow:0 8px 30px #0007}
-  .play{width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#243049;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .play:hover{background:#2c3a52}.play svg{width:18px;height:18px}
-  .tl-body{flex:1;min-width:0}
-  .tl-head{display:flex;align-items:baseline;gap:10px;margin-bottom:9px;white-space:nowrap}
-  .tl-title{font-family:var(--display);font-weight:600;font-size:14px;flex:none;display:flex;align-items:center;gap:8px}
-  .tl-sub{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;min-width:0}
-  .tl-state{margin-left:auto;font-size:11.5px;font-weight:600;flex:none}
-  .track{position:relative;height:6px;border-radius:3px;background:#222a36;cursor:pointer}
-  .track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,#2f81f7,#58a6ff)}
-  .track .head{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--blue);transform:translate(-50%,-50%);box-shadow:0 1px 4px #0008;transition:left .05s linear}
-  .ticks{display:flex;justify-content:space-between;margin-top:8px;font-size:10.5px;color:var(--faint)}
-  .maplibregl-popup-content{background:#12161f;color:var(--text);border:1px solid var(--border);border-radius:9px;font-family:var(--font);font-size:11.5px;padding:10px 12px;box-shadow:0 6px 22px #0008}
-  .maplibregl-popup-tip{border-top-color:#12161f!important;border-bottom-color:#12161f!important}
-  .pop b{font-family:var(--display);font-size:13px}.pop .row{color:var(--muted);margin-top:3px}
-  @media (max-width:1240px){main{grid-template-columns:1fr 330px}.basemap{right:346px}.timeline{right:354px;left:18px}}
-  @media (max-width:1000px){main{grid-template-columns:1fr 288px}.basemap{right:302px}.timeline{right:308px;left:14px}.tl-sub{display:none}}
+:root {
+  --bg:    #07101e;
+  --s1:    #0b1421;
+  --s2:    #0f1b2d;
+  --s3:    #142036;
+  --b1:    #1c2e44;
+  --b2:    #243a56;
+
+  --t0:    #cddcec;
+  --t1:    #7c9ab8;
+  --t2:    #485f78;
+
+  --amber: #b07818;
+  --teal:  #2272a4;
+  --red:   #a02828;
+  --green: #1e7244;
+  --orange:#b06010;
+
+  --fd: 'Space Grotesk', system-ui, sans-serif;
+  --fb: 'IBM Plex Sans', system-ui, sans-serif;
+  --fm: 'IBM Plex Mono', 'Consolas', monospace;
+  --r: 4px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--t0); font-family: var(--fb); -webkit-font-smoothing: antialiased; }
+
+/* ── SHELL ───────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* ── TOPBAR ──────────────────────────────────────── */
+.topbar {
+  height: 50px; flex: none;
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 0;
+  background: var(--s1);
+  border-bottom: 1px solid var(--b1);
+}
+.brand { display: flex; align-items: center; gap: 9px; flex: none; }
+.brand-name {
+  font-family: var(--fd); font-size: 14px; font-weight: 700;
+  color: var(--t0); letter-spacing: 0.3px;
+}
+.brand-tag {
+  font-family: var(--fd); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--amber);
+  background: rgba(176,120,24,0.1);
+  border: 1px solid rgba(176,120,24,0.28);
+  padding: 3px 7px; border-radius: 3px;
+}
+
+.search-zone {
+  flex: 1; display: flex; justify-content: center;
+  position: relative; padding: 0 24px;
+}
+.search-wrap { position: relative; width: 340px; max-width: 100%; }
+.search-ico {
+  position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+  color: var(--t2); pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  background: var(--s2); border: 1px solid var(--b1);
+  color: var(--t0); font-family: var(--fb); font-size: 11.5px;
+  padding: 7px 10px 7px 28px;
+  border-radius: var(--r); outline: none;
+  transition: border-color 0.15s;
+}
+.search-input::placeholder { color: var(--t2); }
+.search-input:focus { border-color: var(--teal); }
+.sdrop {
+  position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+  background: var(--s2); border: 1px solid var(--b2);
+  border-radius: var(--r); list-style: none;
+  display: none; z-index: 200; overflow: hidden;
+}
+.sdrop.open { display: block; }
+.sdrop li {
+  padding: 7px 10px; font-size: 11.5px; cursor: pointer;
+  color: var(--t1); border-bottom: 1px solid var(--b1);
+  transition: background 0.1s;
+}
+.sdrop li:last-child { border-bottom: none; }
+.sdrop li:hover { background: var(--s3); color: var(--t0); }
+.sdrop-sub { font-size: 10px; color: var(--t2); margin-top: 1px; }
+
+.topbar-meta {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 11px; flex: none;
+}
+.mk { color: var(--t2); font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
+.mv { color: var(--t1); font-weight: 500; }
+.msep { width: 1px; height: 14px; background: var(--b1); }
+
+/* ── WORKSPACE ───────────────────────────────────── */
+.workspace { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* ── PANELS ──────────────────────────────────────── */
+.panel {
+  flex: none; display: flex; flex-direction: column;
+  overflow: hidden; background: var(--s1);
+}
+.lp { width: 258px; border-right: 1px solid var(--b1); }
+.rp { width: 318px; border-left:  1px solid var(--b1); }
+
+.ps {
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--b1);
+  flex: none;
+}
+.ps.grow { flex: 1; }
+.ps.fill {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+
+.ph {
+  font-family: var(--fd); font-size: 9px; font-weight: 700;
+  letter-spacing: 1.1px; text-transform: uppercase; color: var(--t2);
+  margin-bottom: 9px; display: flex; align-items: center; gap: 6px;
+}
+.ph-sub { font-weight: 400; letter-spacing: 0.3px; text-transform: none; font-size: 9px; }
+
+/* ── STAT GRID ───────────────────────────────────── */
+.sg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sc {
+  background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r); padding: 8px 9px;
+}
+.sv {
+  display: block; font-family: var(--fm);
+  font-size: 17px; font-weight: 600; color: var(--t0); line-height: 1;
+}
+.sv.na { color: var(--t2); }
+.sl { display: block; font-size: 9px; color: var(--t2); margin-top: 4px; letter-spacing: 0.1px; }
+
+/* ── MAP ZONE ────────────────────────────────────── */
+.mz { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#map { flex: 1; min-height: 0; }
+
+/* ── MAP FOOTER ──────────────────────────────────── */
+.mf {
+  flex: none; height: 78px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px;
+  background: var(--s1); border-top: 1px solid var(--b1);
+}
+.mc { display: flex; gap: 5px; flex: none; }
+.cg {
+  display: flex; border: 1px solid var(--b1);
+  border-radius: var(--r); overflow: hidden;
+}
+.cb {
+  background: var(--s2); border: none; color: var(--t1);
+  font-family: var(--fb); font-size: 10.5px; font-weight: 600;
+  padding: 5px 9px; cursor: pointer; transition: background 0.1s; line-height: 1;
+}
+.cb:hover { background: var(--s3); color: var(--t0); }
+.cb.on { background: var(--s3); color: var(--t0); }
+.cb + .cb { border-left: 1px solid var(--b1); }
+.cb-z { font-family: var(--fm); font-size: 14px; padding: 3px 9px; }
+
+/* ── TIMELINE ────────────────────────────────────── */
+.tlbar { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pbtn {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 50%; border: 1px solid var(--b2);
+  background: var(--s2); color: var(--t0); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s;
+}
+.pbtn:hover { background: var(--s3); }
+.tlbody { flex: 1; min-width: 0; }
+.tlrow {
+  display: flex; align-items: baseline; gap: 7px;
+  margin-bottom: 7px; white-space: nowrap;
+}
+.tlscen { display: flex; align-items: center; gap: 5px; font-family: var(--fd); font-size: 11.5px; font-weight: 600; flex: none; }
+.tldot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.tlsub { font-size: 10px; color: var(--t2); overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.tlstate { font-size: 10px; font-weight: 600; flex: none; margin-left: auto; font-family: var(--fm); }
+.track {
+  position: relative; height: 3px; border-radius: 2px;
+  background: var(--s3); cursor: pointer;
+}
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--teal); }
+.head {
+  position: absolute; top: 50%; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--t0); border: 2px solid var(--teal);
+  transform: translate(-50%, -50%); transition: left 0.05s linear;
+}
+.ticks {
+  display: flex; justify-content: space-between; margin-top: 5px;
+  font-size: 9px; color: var(--t2); font-family: var(--fm);
+}
+
+/* ── SCENARIOS ───────────────────────────────────── */
+.chips { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.chip {
+  background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r); padding: 8px 9px; cursor: pointer;
+  transition: border-color 0.12s; display: flex; flex-direction: column; gap: 3px;
+}
+.chip:hover { border-color: var(--b2); }
+.chip.on { border-color: currentColor; }
+.chip .t { font-family: var(--fd); font-size: 11px; font-weight: 600; line-height: 1.2; }
+.chip .d { font-size: 9px; color: var(--t2); line-height: 1.3; }
+
+.sdesc { font-size: 10.5px; color: var(--t2); line-height: 1.6; margin-top: 8px; }
+
+/* ── READOUTS ────────────────────────────────────── */
+.rg { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.ro {
+  background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r); padding: 8px 9px;
+}
+.rv {
+  display: block; font-family: var(--fm);
+  font-size: 17px; font-weight: 600; line-height: 1;
+  transition: color 0.15s;
+}
+.rl { display: block; font-size: 9px; color: var(--t2); margin-top: 4px; letter-spacing: 0.1px; }
+
+/* ── SPARK ───────────────────────────────────────── */
+.spark {
+  display: flex; align-items: flex-end; gap: 1.5px;
+  margin-top: 8px; height: 36px; flex: 1; min-height: 24px;
+}
+.b { flex: 1; border-radius: 1px 1px 0 0; background: var(--s3); }
+
+.inote { font-size: 10px; color: var(--t2); line-height: 1.55; margin-top: 7px; }
+
+/* ── GATEKEEPER LIST ─────────────────────────────── */
+.gk {
+  display: flex; align-items: center; gap: 7px;
+  padding: 3px 0; border-bottom: 1px solid var(--b1);
+}
+.gk:last-child { border-bottom: none; }
+.rank { font-family: var(--fm); font-size: 9.5px; color: var(--t2); width: 12px; text-align: right; flex: none; }
+.bar { flex: 1; height: 3px; background: var(--s3); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--amber), var(--red)); border-radius: 2px; }
+.val { font-family: var(--fm); font-size: 9.5px; color: var(--t1); width: 32px; text-align: right; flex: none; }
+
+/* ── MAP LAYER TOGGLE ────────────────────────────── */
+.tog {
+  display: flex; background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r); overflow: hidden;
+}
+.tb {
+  flex: 1; border: none; background: transparent; color: var(--t2);
+  font-family: var(--fb); font-size: 10.5px; font-weight: 600;
+  padding: 7px 5px; cursor: pointer; transition: 0.1s;
+}
+.tb.on { background: var(--s3); color: var(--t0); }
+
+.cw { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 9.5px; color: var(--t2); }
+.cw-ramp { flex: 1; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); }
+
+/* ── LEGEND ──────────────────────────────────────── */
+.leg { display: flex; flex-direction: column; gap: 5px; }
+.li { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--t1); }
+.ld { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.foot { font-size: 9.5px; color: var(--t2); line-height: 1.55; margin-top: 9px; border-top: 1px solid var(--b1); padding-top: 8px; }
+
+/* ── POPUP ───────────────────────────────────────── */
+.maplibregl-popup-content {
+  background: var(--s2) !important; color: var(--t0) !important;
+  border: 1px solid var(--b2) !important; border-radius: var(--r) !important;
+  font-family: var(--fb) !important; font-size: 11px !important;
+  padding: 9px 11px !important; box-shadow: 0 4px 18px rgba(0,0,0,.55) !important;
+}
+.maplibregl-popup-tip { border-top-color: var(--s2) !important; border-bottom-color: var(--s2) !important; }
+.pop b { font-family: var(--fd); font-size: 12px; display: block; margin-bottom: 4px; }
+.pop .row { color: var(--t1); margin-top: 2px; }
+.maplibregl-ctrl-attrib { display: none !important; }
+.maplibregl-ctrl-top-left { display: none !important; }
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
+
+  <!-- TOP BAR -->
+  <header class="topbar">
     <div class="brand">
-      <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
-        <rect x="0" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="0" width="4" height="4" rx=".5" fill="#5a7d8a"/>
-        <rect x="0" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="5" width="4" height="4" rx=".5" fill="#5a7d8a"/>
-        <rect x="0" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="15" y="10" width="4" height="4" rx=".5" fill="#5a7d8a"/>
-        <rect x="0" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="5" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><rect x="10" y="15" width="4" height="4" rx=".5" fill="#5a7d8a"/><circle cx="17" cy="17" r="2.4" fill="#c45a5a"/>
-      </svg> SatMesh
+      <svg width="17" height="17" viewBox="0 0 20 20">
+        <rect x="0"  y="0"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="5"  y="0"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="10" y="0"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="15" y="0"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="0"  y="5"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="5"  y="5"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="10" y="5"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="15" y="5"  width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="0"  y="10" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="5"  y="10" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="10" y="10" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="15" y="10" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="0"  y="15" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="5"  y="15" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <rect x="10" y="15" width="4" height="4" rx=".5" fill="#3e7090"/>
+        <circle cx="17" cy="17" r="2.2" fill="#a03030"/>
+      </svg>
+      <span class="brand-name">SatMesh</span>
+      <span class="brand-tag">ISRO BAH 2026 PS4</span>
     </div>
-    <span class="tag">ISRO BAH 2026 · PS4 · ROUTE RESILIENCE</span>
-    <span class="live"><span class="blip"></span>LIVE GRAPH ENGINE</span>
-    <div class="spacer"></div>
-    <div class="src">City <b id="cityName">Bengaluru</b> &nbsp;·&nbsp; Data <b>OpenStreetMap + SRTM Terrarium</b></div>
+
+    <div class="search-zone">
+      <div class="search-wrap">
+        <svg class="search-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="searchInput" class="search-input" type="text" placeholder="Search location within Bengaluru" autocomplete="off" />
+        <ul id="searchDrop" class="sdrop"></ul>
+      </div>
+    </div>
+
+    <div class="topbar-meta">
+      <span class="mk">City</span>
+      <span class="mv" id="cityName">Bengaluru</span>
+      <div class="msep"></div>
+      <span class="mk">Source</span>
+      <span class="mv">OSM + SRTM</span>
+    </div>
   </header>
-  <main>
-    <div id="map"></div>
-    <div class="basemap"><button id="bDark" class="on">Dark</button><button id="bSat">Satellite</button></div>
 
-    <div class="timeline">
-      <button class="play" id="play" title="Run scenario"><svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
-      <div class="tl-body">
-        <div class="tl-head">
-          <span class="tl-title"><span id="tlDot" class="dot" style="background:var(--blue)"></span><span id="tlTitle">Monsoon Flood</span></span>
-          <span class="tl-sub" id="tlSub">Cloudburst, water rising by elevation</span>
-          <span class="tl-state" id="tlState" style="color:var(--blue)">stage 0</span>
+  <!-- WORKSPACE -->
+  <div class="workspace">
+
+    <!-- LEFT PANEL -->
+    <aside class="panel lp">
+      <section class="ps">
+        <div class="ph">Network Overview</div>
+        <div class="sg">
+          <div class="sc"><span class="sv" id="mNodes">0</span><span class="sl">Intersections</span></div>
+          <div class="sc"><span class="sv" id="mEdges">0</span><span class="sl">Road Segments</span></div>
+          <div class="sc"><span class="sv" id="mComps">1</span><span class="sl">Components</span></div>
+          <div class="sc"><span class="sv" id="mElev">74</span><span class="sl">Elevation Span m</span></div>
         </div>
-        <div class="track" id="track"><div class="fill" id="fill"></div><div class="head" id="head"></div></div>
-        <div class="ticks" id="ticks"></div>
+      </section>
+
+      <section class="ps">
+        <div class="ph">Evaluation Metrics</div>
+        <div class="sg">
+          <div class="sc"><span class="sv na" id="mIoU">--</span><span class="sl">mIoU</span></div>
+          <div class="sc"><span class="sv na" id="mDice">--</span><span class="sl">Dice Score</span></div>
+          <div class="sc"><span class="sv na" id="mOccRec">--</span><span class="sl">Occlusion Recall</span></div>
+          <div class="sc"><span class="sv na" id="mConn">--</span><span class="sl">Connectivity Ratio</span></div>
+        </div>
+      </section>
+
+      <section class="ps">
+        <div class="ph">Graph Topology</div>
+        <div class="sg">
+          <div class="sc"><span class="sv na" id="mAPLS">--</span><span class="sl">APLS Score</span></div>
+          <div class="sc"><span class="sv na" id="mRelIoU">--</span><span class="sl">Relaxed IoU</span></div>
+          <div class="sc"><span class="sv" id="mGate">12</span><span class="sl">Gatekeeper Nodes</span></div>
+          <div class="sc"><span class="sv" id="mFlood">13</span><span class="sl">Flood Critical</span></div>
+        </div>
+      </section>
+
+      <section class="ps grow">
+        <div class="ph">Map Layer</div>
+        <div class="tog">
+          <button id="vCrit" class="tb on">Criticality Worth</button>
+          <button id="vScen" class="tb">Scenario Impact</button>
+        </div>
+        <div class="cw">
+          <span>Low</span>
+          <div class="cw-ramp"></div>
+          <span>High</span>
+        </div>
+      </section>
+    </aside>
+
+    <!-- MAP -->
+    <div class="mz">
+      <div id="map"></div>
+      <div class="mf">
+        <div class="mc">
+          <div class="cg">
+            <button id="zoomIn"  class="cb cb-z">+</button>
+            <button id="zoomOut" class="cb cb-z">&#8722;</button>
+          </div>
+          <div class="cg">
+            <button id="bDark" class="cb on">Dark</button>
+            <button id="bSat"  class="cb">Satellite</button>
+          </div>
+        </div>
+        <div class="tlbar">
+          <button class="pbtn" id="play" title="Play scenario">
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <div class="tlbody">
+            <div class="tlrow">
+              <div class="tlscen"><span class="tldot" id="tlDot"></span><span id="tlTitle">Monsoon Flood</span></div>
+              <span class="tlsub" id="tlSub">Cloudburst, water rising by elevation</span>
+              <span class="tlstate" id="tlState" style="color:var(--teal)">Stage 0</span>
+            </div>
+            <div class="track" id="track">
+              <div class="fill" id="fill"></div>
+              <div class="head" id="head"></div>
+            </div>
+            <div class="ticks" id="ticks"></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <aside>
-      <div class="sec">
-        <h2>Road network (real)</h2>
-        <div class="grid">
-          <div class="card"><div class="v" id="mNodes">0</div><div class="l">Intersections</div></div>
-          <div class="card"><div class="v" id="mEdges">0</div><div class="l">Road segments</div></div>
-        </div>
-      </div>
-
-      <div class="sec">
-        <h2>Stress test scenario</h2>
+    <!-- RIGHT PANEL -->
+    <aside class="panel rp">
+      <section class="ps">
+        <div class="ph">Stress Test Scenario</div>
         <div class="chips" id="chips"></div>
-        <div class="scendesc" id="scendesc"></div>
-      </div>
+        <p class="sdesc" id="scendesc"></p>
+      </section>
 
-      <div class="sec">
-        <h2>Live impact</h2>
-        <div class="readouts">
-          <div class="ro"><div class="v" id="rLost" style="color:var(--blue)">0%</div><div class="l">Roads lost</div></div>
-          <div class="ro"><div class="v" id="rConn">100%</div><div class="l">Connectivity</div></div>
-          <div class="ro"><div class="v" id="rIso">0</div><div class="l">Isolated zones</div></div>
-          <div class="ro"><div class="v" id="rRes" style="color:var(--green)">1.00</div><div class="l">Resilience Idx</div></div>
+      <section class="ps fill">
+        <div class="ph">Live Network Impact</div>
+        <div class="rg">
+          <div class="ro"><span class="rv" id="rLost" style="color:var(--teal)">0%</span><span class="rl">Roads Lost</span></div>
+          <div class="ro"><span class="rv" id="rConn" style="color:var(--green)">100%</span><span class="rl">Connectivity</span></div>
+          <div class="ro"><span class="rv" id="rIso">0</span><span class="rl">Isolated Zones</span></div>
+          <div class="ro"><span class="rv" id="rRes" style="color:var(--green)">1.00</span><span class="rl">Resilience Index</span></div>
         </div>
         <div class="spark" id="spark"></div>
-        <div class="note" id="impnote">Run a scenario: the live graph engine recomputes connectivity and the Resilience Index as roads fail. Lower means more vulnerable.</div>
-      </div>
+        <p class="inote" id="impnote">Select a scenario and press play. The engine recomputes global network efficiency and the Resilience Index at each step in real time.</p>
+      </section>
 
-      <div class="sec">
-        <h2>Map layer</h2>
-        <div class="toggle"><button id="vCrit" class="on">Criticality Worth</button><button id="vScen">Scenario impact</button></div>
-        <div class="legend"><span>Low</span><div class="ramp"></div><span>High</span></div>
-      </div>
-
-      <div class="sec">
-        <h2>Top gatekeeper nodes</h2>
+      <section class="ps">
+        <div class="ph">Gatekeeper Nodes <span class="ph-sub">Betweenness Centrality</span></div>
         <div id="gklist"></div>
-      </div>
+      </section>
 
-      <div class="sec">
-        <span class="pill"><span class="dot" style="background:var(--red)"></span>Gatekeeper</span>
-        <span class="pill"><span class="dot" style="background:var(--blue)"></span>Flood critical</span>
-      </div>
-      <div class="foot" id="foot">Loading real Bengaluru network.</div>
+      <section class="ps grow">
+        <div class="ph">Legend</div>
+        <div class="leg">
+          <div class="li"><span class="ld" style="background:var(--red)"></span><span>Gatekeeper Node</span></div>
+          <div class="li"><span class="ld" style="background:var(--teal)"></span><span>Flood Critical Node</span></div>
+        </div>
+        <p class="foot" id="foot">Loading network data.</p>
+      </section>
     </aside>
-  </main>
+
+  </div>
 </div>
 
 <script>
-const C={green:'#3fb950',amber:'#d29922',red:'#f85149',blue:'#2f81f7',orange:'#f0883e',dim:'#39424f'};
-const DARK='https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-const SAT={version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'Esri'}},layers:[{id:'sat',type:'raster',source:'sat'}]};
-function critColor(t){const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));const g=[63,185,80],a=[210,153,34],r=[248,81,73];const c=t<0.5?lerp(g,a,t/.5):lerp(a,r,(t-.5)/.5);return`rgb(${c[0]},${c[1]},${c[2]})`;}
+const C = {
+  green:'#1e7244', amber:'#b07818', red:'#a02828',
+  teal:'#2272a4', orange:'#b06010', dim:'#162840'
+};
+const DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const SAT = {version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256}},layers:[{id:'sat',type:'raster',source:'sat'}]};
 
-const map=new maplibregl.Map({container:'map',style:DARK,center:[77.590,12.978],zoom:13.2,attributionControl:false});
-map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-left');
+function critColor(t) {
+  const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));
+  const g=[30,114,68],a=[176,120,24],r=[160,40,40];
+  const c=t<0.5?lerp(g,a,t/.5):lerp(a,r,(t-.5)/.5);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
 
-let DATA,edgeFC,ptsFC,nodeById={},adj=new Map(),adjW=new Map(),critRank={},elevMin,elevMax,floodMax,baseEff=1,scen='flood',view='crit',curFrac=0,epi=null;
+const map = new maplibregl.Map({container:'map',style:DARK,center:[77.590,12.978],zoom:13.2,attributionControl:false});
+
+let DATA,edgeFC,ptsFC,nodeById={},adj=new Map(),adjW=new Map(),
+    critRank={},elevMin,elevMax,floodMax,baseEff=1,
+    scen='flood',view='crit',curFrac=0,epi=null;
 const STEPS=60;
-class MinHeap{constructor(){this.a=[]}get size(){return this.a.length}
- push(k,v){const a=this.a;a.push([k,v]);let i=a.length-1;while(i>0){const p=(i-1)>>1;if(a[p][0]<=a[i][0])break;[a[p],a[i]]=[a[i],a[p]];i=p;}}
- pop(){const a=this.a,top=a[0],last=a.pop();if(a.length){a[0]=last;let i=0;for(;;){let l=2*i+1,r=l+1,m=i;if(l<a.length&&a[l][0]<a[m][0])m=l;if(r<a.length&&a[r][0]<a[m][0])m=r;if(m===i)break;[a[m],a[i]]=[a[i],a[m]];i=m;}}return top;}}
 
-// scenario definitions: each maps a timeline fraction -> a set of failed nodes,
-// plus per-edge scalar field + threshold for fast map painting.
-const SCEN={
-  flood:{name:'Monsoon Flood',sub:'Cloudburst, water rising by elevation',color:C.blue,
-    desc:'Water rises by real SRTM elevation. Low lying roads submerge first and the network fragments from the bottom up.',
-    field:'minElev',thr:f=>elevMin+f*(floodMax-elevMin),op:'<=',
+class MinHeap {
+  constructor(){this.a=[];}
+  get size(){return this.a.length;}
+  push(k,v){const a=this.a;a.push([k,v]);let i=a.length-1;while(i>0){const p=(i-1)>>1;if(a[p][0]<=a[i][0])break;[a[p],a[i]]=[a[i],a[p]];i=p;}}
+  pop(){const a=this.a,top=a[0],last=a.pop();if(a.length){a[0]=last;let i=0;for(;;){let l=2*i+1,r=l+1,m=i;if(l<a.length&&a[l][0]<a[m][0])m=l;if(r<a.length&&a[r][0]<a[m][0])m=r;if(m===i)break;[a[m],a[i]]=[a[i],a[m]];i=m;}}return top;}
+}
+
+const SCEN = {
+  flood:{
+    name:'Monsoon Flood', sub:'Cloudburst, water rising by elevation', color:C.teal,
+    desc:'Water rises by real SRTM elevation. Low lying road nodes submerge first and the network fragments progressively from the lowest elevations upward.',
+    field:'minElev', thr:f=>elevMin+f*(floodMax-elevMin), op:'<=',
     dead:f=>{const w=elevMin+f*(floodMax-elevMin);return id=>nodeById[id].elev<=w;},
     state:f=>'Water '+(elevMin+f*(floodMax-elevMin)).toFixed(0)+' m',
-    tick:f=>clock(18*60+12*60*f)},
-  quake:{name:'Earthquake',sub:'Shaking radiates from the epicentre',color:C.orange,
-    desc:'Ground shaking radiates outward from an epicentre (click the map to move it). Roads inside the damage radius fail.',
-    field:'epiDist',thr:f=>f*maxR(),op:'<=',
+    tick:f=>clock(18*60+12*60*f)
+  },
+  quake:{
+    name:'Seismic Event', sub:'Shaking radiates from epicentre', color:C.orange,
+    desc:'Ground shaking radiates outward from a configurable epicentre. Click the map to reposition the origin point. All nodes within the expanding damage radius are disabled.',
+    field:'epiDist', thr:f=>f*maxR(), op:'<=',
     dead:f=>{const r=f*maxR();return id=>nodeById[id].epiDist<=r;},
     state:f=>'Radius '+(f*maxR()/1000).toFixed(1)+' km',
-    tick:f=>'T+'+Math.round(f*90)+'s'},
-  gate:{name:'Gatekeeper Collapse',sub:'Most critical intersections fail',color:C.red,
-    desc:'The highest betweenness intersections fail one by one. These gatekeepers carry the most routes, so the network collapses fast.',
-    field:'gateRank',thr:f=>Math.round(f*GMAX),op:'<',
+    tick:f=>'T+'+Math.round(f*90)+'s'
+  },
+  gate:{
+    name:'Gatekeeper Collapse', sub:'Critical intersections fail in sequence', color:C.red,
+    desc:'Nodes are disabled in descending order of betweenness centrality. Gatekeepers carry the most shortest paths; their sequential loss collapses network efficiency far faster than random failure.',
+    field:'gateRank', thr:f=>Math.round(f*GMAX), op:'<',
     dead:f=>{const k=Math.round(f*GMAX);return id=>critRank[id]<k;},
-    state:f=>Math.round(f*GMAX)+' nodes down',
-    tick:f=>Math.round(f*GMAX)+''},
-  accident:{name:'Major Accident',sub:'Arterial corridor blocked',color:C.amber,
-    desc:'A blockage spreads along the busiest arterial corridor (congestion backing up). A localised but high traffic failure.',
-    field:'accDist',thr:f=>f*ACCR,op:'<=',
+    state:f=>Math.round(f*GMAX)+' nodes disabled',
+    tick:f=>Math.round(f*GMAX)+''
+  },
+  accident:{
+    name:'Arterial Blockage', sub:'Corridor congestion propagates outward', color:C.amber,
+    desc:'A blockage originates at the primary gatekeeper node and spreads along the highest traffic corridor, simulating sustained arterial congestion or construction closure.',
+    field:'accDist', thr:f=>f*ACCR, op:'<=',
     dead:f=>{const r=f*ACCR;return id=>nodeById[id].accDist<=r;},
     state:f=>(f*100).toFixed(0)+'% corridor',
-    tick:f=>(f*100).toFixed(0)+'%'}
+    tick:f=>(f*100).toFixed(0)+'%'
+  }
 };
 const GMAX=280, ACCR=1700;
 function maxR(){return DATA?DATA._diag*0.55:3000;}
@@ -220,31 +522,57 @@ function clock(min){let h=Math.floor(min/60)%24,m=Math.round(min)%60;const ap=h>
 function mDist(a,b){const la=(a.lat+b.lat)/2*Math.PI/180;const dx=(a.lon-b.lon)*Math.cos(la),dy=a.lat-b.lat;return Math.sqrt(dx*dx+dy*dy)*111000;}
 
 fetch('resilience.json').then(r=>r.json()).then(d=>{
-  DATA=d;const m=d.metrics;
-  cityName.textContent=d.city;mNodes.textContent=m.n_nodes.toLocaleString();mEdges.textContent=m.n_edges.toLocaleString();
-  elevMin=m.elev_min_m;elevMax=m.elev_max_m;floodMax=elevMin+(elevMax-elevMin)*0.92;
+  DATA=d; const m=d.metrics;
+  cityName.textContent=d.city;
+  mNodes.textContent=m.n_nodes.toLocaleString();
+  mEdges.textContent=m.n_edges.toLocaleString();
+  mComps.textContent='1';
+  mElev.textContent=(m.elev_max_m-m.elev_min_m).toFixed(0);
+  if(document.getElementById('mGate')) mGate.textContent=m.gatekeeper_count||12;
+  if(document.getElementById('mFlood')) mFlood.textContent=m.flood_critical_count||13;
+
+  elevMin=m.elev_min_m; elevMax=m.elev_max_m;
+  floodMax=elevMin+(elevMax-elevMin)*0.92;
+
   d.nodes.forEach(n=>{nodeById[n.id]=n;adj.set(n.id,[]);adjW.set(n.id,[]);});
-  d.edges.forEach(e=>{if(adj.has(e.s)&&adj.has(e.t)){adj.get(e.s).push(e.t);adj.get(e.t).push(e.s);
-    const w=e.len||1;adjW.get(e.s).push([e.t,w]);adjW.get(e.t).push([e.s,w]);}});
-  // criticality rank (0 = most critical)
-  const sorted=[...d.nodes].sort((a,b)=>b.crit-a.crit);sorted.forEach((n,i)=>critRank[n.id]=i);
-  // bbox diagonal for quake radius
-  const bb=d.bbox;DATA._diag=mDist({lat:bb[0],lon:bb[1]},{lat:bb[2],lon:bb[3]});
-  // default epicentre = geographic centre; accident corridor = top gatekeeper
+  d.edges.forEach(e=>{
+    if(adj.has(e.s)&&adj.has(e.t)){
+      adj.get(e.s).push(e.t); adj.get(e.t).push(e.s);
+      const w=e.len||1;
+      adjW.get(e.s).push([e.t,w]); adjW.get(e.t).push([e.s,w]);
+    }
+  });
+
+  const sorted=[...d.nodes].sort((a,b)=>b.crit-a.crit);
+  sorted.forEach((n,i)=>critRank[n.id]=i);
+
+  const bb=d.bbox;
+  DATA._diag=mDist({lat:bb[0],lon:bb[1]},{lat:bb[2],lon:bb[3]});
   epi={lat:(bb[0]+bb[2])/2,lon:(bb[1]+bb[3])/2};
-  const topGate=sorted[0];window._acc=topGate;
+  window._acc=sorted[0];
+
   computeDistances();
-  edgeFC={type:'FeatureCollection',features:d.edges.map(e=>{const a=nodeById[e.s],b=nodeById[e.t];
+
+  edgeFC={type:'FeatureCollection',features:d.edges.map(e=>{
+    const a=nodeById[e.s],b=nodeById[e.t];
     return{type:'Feature',geometry:{type:'LineString',coordinates:e.coords},properties:{
       crit:Math.max(a.crit,b.crit),color:critColor(Math.max(a.crit,b.crit)),len:e.len,
       minElev:Math.min(a.elev,b.elev),gateRank:Math.min(critRank[e.s],critRank[e.t]),
-      epiDist:Math.min(a.epiDist,b.epiDist),accDist:Math.min(a.accDist,b.accDist)}};})};
-  ptsFC={type:'FeatureCollection',features:d.nodes.filter(n=>n.gatekeeper||n.flood_critical).map(n=>({type:'Feature',geometry:{type:'Point',coordinates:[n.lon,n.lat]},properties:{kind:n.flood_critical?'flood':'gate'}}))};
-  foot.innerHTML=`Real OpenStreetMap drive network. Per node SRTM elevation ${m.elev_min_m} to ${m.elev_max_m} m. Betweenness centrality. ${m.n_nodes.toLocaleString()} nodes, ${m.n_edges.toLocaleString()} edges. No synthetic data.`;
+      epiDist:Math.min(a.epiDist,b.epiDist),accDist:Math.min(a.accDist,b.accDist)
+    }};
+  })};
+
+  ptsFC={type:'FeatureCollection',features:d.nodes.filter(n=>n.gatekeeper||n.flood_critical).map(n=>({
+    type:'Feature',geometry:{type:'Point',coordinates:[n.lon,n.lat]},
+    properties:{kind:n.flood_critical?'flood':'gate'}
+  }))};
+
+  foot.textContent=`OpenStreetMap drive network, central Bengaluru. SRTM elevation ${m.elev_min_m} to ${m.elev_max_m} m per node. Betweenness centrality on ${m.n_nodes.toLocaleString()} nodes and ${m.n_edges.toLocaleString()} edges. No synthetic data.`;
+
   baseEff=efficiency(()=>false);
-  buildChips();buildGK(sorted);buildSpark();
+  buildChips(); buildGK(sorted); buildSpark();
   selectScen('flood');
-  if(map.isStyleLoaded())addData();else map.on('load',addData);
+  if(map.isStyleLoaded()) addData(); else map.on('load',addData);
 });
 
 function computeDistances(){
@@ -255,113 +583,239 @@ function computeDistances(){
 }
 
 function addData(){
-  if(!edgeFC)return;
-  if(!map.getSource('edges'))map.addSource('edges',{type:'geojson',data:edgeFC});
-  if(!map.getLayer('edges'))map.addLayer({id:'edges',type:'line',source:'edges',layout:{'line-cap':'round','line-join':'round'},
-    paint:{'line-color':['get','color'],'line-width':['interpolate',['linear'],['zoom'],11,['+',.5,['*',2.5,['get','crit']]],15,['+',1.2,['*',4.5,['get','crit']]]],'line-opacity':.92}});
-  if(!map.getSource('pts'))map.addSource('pts',{type:'geojson',data:ptsFC});
-  if(!map.getLayer('pts'))map.addLayer({id:'pts',type:'circle',source:'pts',paint:{'circle-radius':['case',['==',['get','kind'],'gate'],5.5,4.5],'circle-color':['case',['==',['get','kind'],'gate'],C.red,C.blue],'circle-stroke-width':1.5,'circle-stroke-color':'#0d1117'}});
-  if(!map.getSource('epi'))map.addSource('epi',{type:'geojson',data:epiFC()});
-  if(!map.getLayer('epi'))map.addLayer({id:'epi',type:'circle',source:'epi',paint:{'circle-radius':6,'circle-color':C.orange,'circle-stroke-width':2,'circle-stroke-color':'#fff','circle-opacity':0}});
-  map.on('click','edges',e=>{const p=e.features[0].properties;new maplibregl.Popup({closeButton:false,offset:8}).setLngLat(e.lngLat).setHTML(
-    `<div class="pop"><b>Road segment</b><div class="row">Criticality Worth ${(+p.crit).toFixed(2)}</div><div class="row">Min elevation ${(+p.minElev).toFixed(0)} m</div><div class="row">Length ${(+p.len).toFixed(0)} m</div></div>`).addTo(map);});
+  if(!edgeFC) return;
+  if(!map.getSource('edges')) map.addSource('edges',{type:'geojson',data:edgeFC});
+  if(!map.getLayer('edges')) map.addLayer({id:'edges',type:'line',source:'edges',
+    layout:{'line-cap':'round','line-join':'round'},
+    paint:{
+      'line-color':['get','color'],
+      'line-width':['interpolate',['linear'],['zoom'],11,['+',.5,['*',2.5,['get','crit']]],15,['+',1.2,['*',4.5,['get','crit']]]],
+      'line-opacity':.9
+    }
+  });
+  if(!map.getSource('pts')) map.addSource('pts',{type:'geojson',data:ptsFC});
+  if(!map.getLayer('pts')) map.addLayer({id:'pts',type:'circle',source:'pts',
+    paint:{
+      'circle-radius':['case',['==',['get','kind'],'gate'],5,4],
+      'circle-color':['case',['==',['get','kind'],'gate'],C.red,C.teal],
+      'circle-stroke-width':1.5,'circle-stroke-color':'#07101e'
+    }
+  });
+  if(!map.getSource('epi')) map.addSource('epi',{type:'geojson',data:epiFC()});
+  if(!map.getLayer('epi')) map.addLayer({id:'epi',type:'circle',source:'epi',
+    paint:{'circle-radius':6,'circle-color':C.orange,'circle-stroke-width':2,'circle-stroke-color':'#fff','circle-opacity':0}
+  });
+
+  map.on('click','edges',e=>{
+    const p=e.features[0].properties;
+    new maplibregl.Popup({closeButton:false,offset:8}).setLngLat(e.lngLat).setHTML(
+      `<div class="pop"><b>Road Segment</b>
+       <div class="row">Criticality Worth &nbsp;${(+p.crit).toFixed(3)}</div>
+       <div class="row">Min Elevation &nbsp;${(+p.minElev).toFixed(0)} m</div>
+       <div class="row">Length &nbsp;${(+p.len).toFixed(0)} m</div></div>`
+    ).addTo(map);
+  });
   map.on('mouseenter','edges',()=>map.getCanvas().style.cursor='pointer');
   map.on('mouseleave','edges',()=>map.getCanvas().style.cursor='');
-  map.on('click',e=>{if(scen!=='quake')return;epi={lat:e.lngLat.lat,lon:e.lngLat.lng};computeDistances();refreshEdgeFields();map.getSource('epi').setData(epiFC());setFrac(curFrac);});
+  map.on('click',e=>{
+    if(scen!=='quake') return;
+    epi={lat:e.lngLat.lat,lon:e.lngLat.lng};
+    computeDistances(); refreshEdgeFields();
+    map.getSource('epi').setData(epiFC()); setFrac(curFrac);
+  });
   applyPaint();
 }
-function epiFC(){return{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[epi.lon,epi.lat]},properties:{}}]};}
-function refreshEdgeFields(){edgeFC.features.forEach(f=>{});DATA.edges.forEach((e,i)=>{const a=nodeById[e.s],b=nodeById[e.t];edgeFC.features[i].properties.epiDist=Math.min(a.epiDist,b.epiDist);edgeFC.features[i].properties.accDist=Math.min(a.accDist,b.accDist);});if(map.getSource('edges'))map.getSource('edges').setData(edgeFC);}
 
-/* basemap + view toggles */
-bDark.onclick=()=>setBase('dark');bSat.onclick=()=>setBase('sat');
-function setBase(b){bDark.classList.toggle('on',b==='dark');bSat.classList.toggle('on',b==='sat');map.setStyle(b==='dark'?DARK:SAT);map.once('styledata',()=>setTimeout(addData,140));}
+function epiFC(){return{type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'Point',coordinates:[epi.lon,epi.lat]},properties:{}}]};}
+function refreshEdgeFields(){
+  DATA.edges.forEach((e,i)=>{
+    const a=nodeById[e.s],b=nodeById[e.t];
+    edgeFC.features[i].properties.epiDist=Math.min(a.epiDist,b.epiDist);
+    edgeFC.features[i].properties.accDist=Math.min(a.accDist,b.accDist);
+  });
+  if(map.getSource('edges')) map.getSource('edges').setData(edgeFC);
+}
+
+bDark.onclick=()=>setBase('dark');
+bSat.onclick=()=>setBase('sat');
+function setBase(b){
+  bDark.classList.toggle('on',b==='dark'); bSat.classList.toggle('on',b==='sat');
+  map.setStyle(b==='dark'?DARK:SAT);
+  map.once('styledata',()=>setTimeout(addData,140));
+}
+
+document.getElementById('zoomIn').onclick=()=>map.zoomIn();
+document.getElementById('zoomOut').onclick=()=>map.zoomOut();
+
 vCrit.onclick=()=>{view='crit';vCrit.classList.add('on');vScen.classList.remove('on');applyPaint();};
 vScen.onclick=()=>{view='scen';vScen.classList.add('on');vCrit.classList.remove('on');applyPaint();};
 
-/* scenarios */
 function buildChips(){
-  const icons={flood:['🌊',C.blue],quake:['⊕',C.orange],gate:['◆',C.red],accident:['▣',C.amber]};
+  const cols={flood:C.teal,quake:C.orange,gate:C.red,accident:C.amber};
   chips.innerHTML='';
-  for(const k of Object.keys(SCEN)){const s=SCEN[k],[ic,col]=icons[k];
-    const el=document.createElement('div');el.className='chip'+(k===scen?' on':'');el.dataset.k=k;
-    el.innerHTML=`<div class="ic" style="background:${col}22;color:${col};font-size:13px">${ic}</div><div><div class="t">${s.name}</div><div class="d">${s.sub}</div></div>`;
-    el.onclick=()=>selectScen(k);chips.appendChild(el);}
+  for(const k of Object.keys(SCEN)){
+    const s=SCEN[k],col=cols[k];
+    const el=document.createElement('div');
+    el.className='chip'+(k===scen?' on':'');
+    el.dataset.k=k; el.style.color=col;
+    el.innerHTML=`<span class="t">${s.name}</span><span class="d">${s.sub}</span>`;
+    el.onclick=()=>selectScen(k);
+    chips.appendChild(el);
+  }
 }
+
 function selectScen(k){
-  scen=k;pause();const s=SCEN[k];
+  scen=k; pause(); const s=SCEN[k];
   document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c.dataset.k===k));
-  tlTitle.textContent=s.name;tlSub.textContent=s.sub;tlDot.style.background=s.color;
-  tlState.style.color=s.color;document.querySelector('.fill').style.background=`linear-gradient(90deg,${s.color}99,${s.color})`;
+  tlTitle.textContent=s.name; tlSub.textContent=s.sub;
+  tlDot.style.background=s.color; tlState.style.color=s.color;
+  document.querySelector('.fill').style.background=s.color;
   document.querySelector('.head').style.borderColor=s.color;
   scendesc.textContent=s.desc;
-  map.setPaintProperty&&map.getLayer('epi')&&map.setPaintProperty('epi','circle-opacity',k==='quake'?.9:0);
-  buildTicks();view='scen';vScen.classList.add('on');vCrit.classList.remove('on');
+  if(map.getLayer('epi')) map.setPaintProperty('epi','circle-opacity',k==='quake'?.9:0);
+  buildTicks(); view='scen'; vScen.classList.add('on'); vCrit.classList.remove('on');
   setFrac(0);
 }
-function buildTicks(){ticks.innerHTML='';const s=SCEN[scen];for(let i=0;i<=4;i++){const sp=document.createElement('span');sp.textContent=s.tick(i/4);ticks.appendChild(sp);}}
 
-/* live graph engine */
-function efficiency(isDead){ // sampled weighted (road-length) global efficiency; ratio to baseline = Resilience Index
-  const liveSet=new Set();for(const n of DATA.nodes)if(!isDead(n.id))liveSet.add(n.id);
-  if(liveSet.size<2)return 0;
-  const live=[...liveSet];let srcs=[];for(let i=0;i<Math.min(24,live.length);i++)srcs.push(live[(i*1303)%live.length]);
-  const Nm1=DATA.nodes.length-1;let tot=0;
+function buildTicks(){
+  ticks.innerHTML=''; const s=SCEN[scen];
+  for(let i=0;i<=4;i++){const sp=document.createElement('span');sp.textContent=s.tick(i/4);ticks.appendChild(sp);}
+}
+
+function efficiency(isDead){
+  const liveSet=new Set();
+  for(const n of DATA.nodes) if(!isDead(n.id)) liveSet.add(n.id);
+  if(liveSet.size<2) return 0;
+  const live=[...liveSet]; let srcs=[];
+  for(let i=0;i<Math.min(24,live.length);i++) srcs.push(live[(i*1303)%live.length]);
+  const Nm1=DATA.nodes.length-1; let tot=0;
   for(const s of srcs){
     const dist=new Map([[s,0]]);const h=new MinHeap();h.push(0,s);
-    while(h.size){const[du,u]=h.pop();if(du>dist.get(u))continue;
-      for(const[v,w]of adjW.get(u)){if(!liveSet.has(v))continue;const nd=du+w;if(nd<(dist.get(v)??Infinity)){dist.set(v,nd);h.push(nd,v);}}}
-    for(const[t,dm]of dist){if(t!==s&&dm>0)tot+=1/dm;}
+    while(h.size){
+      const[du,u]=h.pop();if(du>dist.get(u))continue;
+      for(const[v,w]of adjW.get(u)){
+        if(!liveSet.has(v))continue;
+        const nd=du+w;
+        if(nd<(dist.get(v)??Infinity)){dist.set(v,nd);h.push(nd,v);}
+      }
+    }
+    for(const[t,dm]of dist) if(t!==s&&dm>0) tot+=1/dm;
   }
   return tot/srcs.length/Nm1;
 }
-function components(isDead){ // largest comp fraction + isolated comp count
+
+function components(isDead){
   const seen=new Set();let lcc=0,iso=0;
-  for(const n of DATA.nodes){const id=n.id;if(isDead(id)||seen.has(id))continue;
+  for(const n of DATA.nodes){
+    const id=n.id;if(isDead(id)||seen.has(id))continue;
     let sz=0;const q=[id];seen.add(id);let qi=0;
     while(qi<q.length){const u=q[qi++];sz++;for(const v of adj.get(u)){if(isDead(v)||seen.has(v))continue;seen.add(v);q.push(v);}}
-    if(sz>lcc)lcc=sz;if(sz>=3)iso++;}
+    if(sz>lcc)lcc=sz; if(sz>=3)iso++;
+  }
   return{lccFrac:lcc/DATA.nodes.length,iso:Math.max(0,iso-1)};
 }
 
-/* timeline */
 let playing=false,timer=null,sparkVals=[];
 play.onclick=()=>playing?pause():run();
-function run(){playing=true;if(view!=='scen'){view='scen';vScen.classList.add('on');vCrit.classList.remove('on');}
-  playIcon.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';if(curFrac>=1)setFrac(0);
-  timer=setInterval(()=>{let f=curFrac+1/STEPS;if(f>=1){f=1;setFrac(f);pause();}else setFrac(f);},150);}
+
+function run(){
+  playing=true;
+  if(view!=='scen'){view='scen';vScen.classList.add('on');vCrit.classList.remove('on');}
+  playIcon.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  if(curFrac>=1) setFrac(0);
+  timer=setInterval(()=>{let f=curFrac+1/STEPS;if(f>=1){f=1;setFrac(f);pause();}else setFrac(f);},150);
+}
 function pause(){playing=false;clearInterval(timer);playIcon.innerHTML='<path d="M8 5v14l11-7z"/>';}
+
 track.onclick=e=>{pause();const r=e.currentTarget.getBoundingClientRect();setFrac((e.clientX-r.left)/r.width);};
 
 function setFrac(f){
   f=Math.max(0,Math.min(1,f));curFrac=f;const s=SCEN[scen];
-  document.getElementById('fill').style.width=(f*100)+'%';document.getElementById('head').style.left=(f*100)+'%';
+  document.getElementById('fill').style.width=(f*100)+'%';
+  document.getElementById('head').style.left=(f*100)+'%';
   tlState.textContent=s.state(f);
   const isDead=s.dead(f);
   const cmp=components(isDead);const eff=efficiency(isDead);const res=baseEff?eff/baseEff:0;
   const lostN=DATA.nodes.filter(n=>isDead(n.id)).length;const lost=lostN/DATA.nodes.length;
   setRO('rLost',Math.round(lost*100)+'%',s.color);
   setRO('rConn',Math.round(cmp.lccFrac*100)+'%',cmp.lccFrac>.7?C.green:cmp.lccFrac>.4?C.amber:C.red);
-  setRO('rIso',cmp.iso,cmp.iso>6?C.red:cmp.iso>2?C.amber:C.text);
+  setRO('rIso',cmp.iso,cmp.iso>6?C.red:cmp.iso>2?C.amber:null);
   setRO('rRes',res.toFixed(2),res>.7?C.green:res>.4?C.amber:C.red);
   const step=Math.round(f*(STEPS-1));sparkVals[step]=res;drawSpark(step);
   applyPaint();
 }
-function setRO(id,v,c){const e=document.getElementById(id);e.textContent=v;if(c)e.style.color=c;}
-function buildSpark(){spark.innerHTML='';sparkVals=new Array(STEPS).fill(null);for(let i=0;i<STEPS;i++){const b=document.createElement('div');b.className='b';b.style.height='4%';spark.appendChild(b);}}
-function drawSpark(cur){const bars=spark.children;for(let i=0;i<STEPS;i++){const v=sparkVals[i];if(v==null){bars[i].style.height='4%';bars[i].style.background='#1b2433';continue;}bars[i].style.height=(6+v*100*.5)+'%';bars[i].style.background=i===cur?C.accent:(v>.7?'#234a33':v>.4?'#3d3722':'#45272a');}}
+function setRO(id,v,c){const e=document.getElementById(id);e.textContent=v;if(c)e.style.color=c;else e.style.color='';}
 
-function applyPaint(){
-  if(!map.getLayer('edges'))return;const s=SCEN[scen];
-  if(view==='crit'){map.setPaintProperty('edges','line-color',['get','color']);map.setPaintProperty('edges','line-opacity',.92);return;}
-  const thr=s.thr(curFrac);const dead=[s.op,['get',s.field],thr];
-  map.setPaintProperty('edges','line-color',['case',dead,s.color,C.dim]);
-  map.setPaintProperty('edges','line-opacity',['case',dead,.96,.34]);
+function buildSpark(){
+  spark.innerHTML='';sparkVals=new Array(STEPS).fill(null);
+  for(let i=0;i<STEPS;i++){const b=document.createElement('div');b.className='b';b.style.height='4%';spark.appendChild(b);}
+}
+function drawSpark(cur){
+  const bars=spark.children;
+  for(let i=0;i<STEPS;i++){
+    const v=sparkVals[i];
+    if(v==null){bars[i].style.height='4%';bars[i].style.background='#162840';continue;}
+    bars[i].style.height=(6+v*100*.5)+'%';
+    bars[i].style.background=i===cur?'#cddcec':(v>.7?'#163a28':v>.4?'#3a2e10':'#381414');
+  }
 }
 
-function buildGK(sorted){gklist.innerHTML='';const top=sorted.slice(0,6);const mx=top[0].crit||1;
-  top.forEach((n,i)=>{const el=document.createElement('div');el.className='gk';
-    el.innerHTML=`<span class="rank">${i+1}</span><span class="bar"><i style="width:${(n.crit/mx*100).toFixed(0)}%"></i></span><span class="val">${n.crit.toFixed(2)}</span>`;gklist.appendChild(el);});}
+function applyPaint(){
+  if(!map.getLayer('edges')) return; const s=SCEN[scen];
+  if(view==='crit'){map.setPaintProperty('edges','line-color',['get','color']);map.setPaintProperty('edges','line-opacity',.9);return;}
+  const thr=s.thr(curFrac); const dead=[s.op,['get',s.field],thr];
+  map.setPaintProperty('edges','line-color',['case',dead,s.color,C.dim]);
+  map.setPaintProperty('edges','line-opacity',['case',dead,.96,.25]);
+}
+
+function buildGK(sorted){
+  gklist.innerHTML=''; const top=sorted.slice(0,6); const mx=top[0].crit||1;
+  top.forEach((n,i)=>{
+    const el=document.createElement('div'); el.className='gk';
+    el.innerHTML=`<span class="rank">${i+1}</span><span class="bar"><i style="width:${(n.crit/mx*100).toFixed(0)}%"></i></span><span class="val">${n.crit.toFixed(3)}</span>`;
+    gklist.appendChild(el);
+  });
+}
+
+/* ── SEARCH ──────────────────────────────────────── */
+const PLACES=[
+  {name:'MG Road',            region:'Central Bengaluru',     lat:12.9756,lon:77.6099},
+  {name:'Cubbon Park',        region:'Central Bengaluru',     lat:12.9763,lon:77.5929},
+  {name:'Majestic',           region:'Central Bengaluru',     lat:12.9769,lon:77.5713},
+  {name:'Lalbagh',            region:'South Bengaluru',       lat:12.9497,lon:77.5847},
+  {name:'Indiranagar',        region:'East Bengaluru',        lat:12.9784,lon:77.6408},
+  {name:'Koramangala',        region:'South East Bengaluru',  lat:12.9352,lon:77.6245},
+  {name:'Jayanagar',          region:'South Bengaluru',       lat:12.9259,lon:77.5850},
+  {name:'Vidhana Soudha',     region:'Central Bengaluru',     lat:12.9795,lon:77.5909},
+  {name:'Ulsoor Lake',        region:'Central Bengaluru',     lat:12.9825,lon:77.6215},
+  {name:'Brigade Road',       region:'Central Bengaluru',     lat:12.9703,lon:77.6098},
+  {name:'KR Circle',          region:'Central Bengaluru',     lat:12.9760,lon:77.5950},
+  {name:'Shivajinagar',       region:'North Central',         lat:12.9850,lon:77.6020},
+  {name:'Domlur',             region:'East Bengaluru',        lat:12.9607,lon:77.6389},
+  {name:'Residency Road',     region:'Central Bengaluru',     lat:12.9676,lon:77.6053},
+  {name:'Richmond Road',      region:'Central Bengaluru',     lat:12.9592,lon:77.5999},
+];
+
+const srchInput=document.getElementById('searchInput');
+const srchDrop=document.getElementById('searchDrop');
+
+srchInput.addEventListener('input',()=>{
+  const q=srchInput.value.trim().toLowerCase();
+  if(!q){srchDrop.classList.remove('open');return;}
+  const hits=PLACES.filter(p=>p.name.toLowerCase().includes(q)||p.region.toLowerCase().includes(q)).slice(0,6);
+  srchDrop.innerHTML=hits.map(p=>`<li data-lat="${p.lat}" data-lon="${p.lon}"><div>${p.name}</div><div class="sdrop-sub">${p.region}</div></li>`).join('');
+  srchDrop.classList.toggle('open',hits.length>0);
+  srchDrop.querySelectorAll('li').forEach(li=>{
+    li.onclick=()=>{
+      map.flyTo({center:[+li.dataset.lon,+li.dataset.lat],zoom:15.5,duration:900});
+      srchInput.value=li.querySelector('div').textContent;
+      srchDrop.classList.remove('open');
+    };
+  });
+});
+
+document.addEventListener('click',e=>{if(!e.target.closest('.search-zone')) srchDrop.classList.remove('open');});
+srchInput.addEventListener('keydown',e=>{if(e.key==='Escape'){srchDrop.classList.remove('open');srchInput.blur();}});
 </script>
 </body>
 </html>
