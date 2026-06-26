@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Build a HIGH-RES Indian road dataset: Esri World Imagery + OSM masks.
+"""Build a HIGH-RES Indian road dataset: Bing Aerial + OSM masks.
 
-Unlike prepare_india_dataset.py (10 m Sentinel-2, where lanes are sub-pixel), this
-fetches ~0.3-0.6 m Esri World Imagery XYZ tiles where dense urban streets, colony
-lanes and gullies ARE visible, and rasterizes OSM road vectors (all classes) into
-pixel-aligned masks. Output: *_sat.jpg / *_mask.png pairs for fine-tuning the
-0.5 m DeepGlobe model (v2). Everything is auto-labelled (no manual annotation).
+Fetches ~0.3-0.6 m Bing Aerial tiles (the same imagery OSM volunteers used to
+trace roads, so road positions align pixel-perfectly with OSM vector labels).
+Rasterizes OSM road vectors (all classes) into pixel-aligned masks.
+Output: *_sat.jpg / *_mask.png pairs. Everything is auto-labelled.
 
-How alignment works: Esri tiles are Web-Mercator (EPSG:3857). For each sampled
+How alignment works: Bing tiles are Web-Mercator (EPSG:3857). For each sampled
 window we know its exact Mercator bounds, so OSM roads (fetched in lat/lon,
 reprojected to 3857) rasterize pixel-perfectly onto the image.
 
 Full cities at z18 would be millions of tiles, so we sample K random windows per
 region (each a GxG tile block) and fetch OSM once per region.
 
-Needs internet (Esri tiles + OSM Overpass) — run on Colab / Kaggle-with-internet.
+Needs internet (Bing tiles + OSM Overpass) — run on Colab / Kaggle-with-internet.
 
 Example:
     python scripts/build_highres_dataset.py --regions all --zoom 18 \
@@ -28,9 +27,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-ESRI = ("https://server.arcgisonline.com/ArcGIS/rest/services/"
-        "World_Imagery/MapServer/tile/{z}/{y}/{x}")
+BING = "https://ecn.t{s}.tiles.virtualearth.net/tiles/a{qk}.jpeg?g=1"
 ORIGIN = 20037508.342789244  # half the Web-Mercator extent, metres
+
+
+def _quadkey(x, y, z):
+    """Convert XYZ tile coords to Bing quadkey string."""
+    qk = []
+    for i in range(z, 0, -1):
+        d = 0
+        mask = 1 << (i - 1)
+        if x & mask:
+            d += 1
+        if y & mask:
+            d += 2
+        qk.append(str(d))
+    return "".join(qk)
 
 
 def deg2tile(lat, lon, z):
@@ -49,14 +61,15 @@ def tile_merc_bounds(rx, ry, g, z):
 
 
 def fetch_window(rx, ry, g, z, session, pause=0.03):
-    """Download + stitch a gxg Esri tile block; return (rgb HxWx3 uint8, merc_bounds)."""
+    """Download + stitch a gxg Bing tile block; return (rgb HxWx3 uint8, merc_bounds)."""
     import numpy as np
     import cv2
     mosaic = np.zeros((g * 256, g * 256, 3), np.uint8)
     hdr = {"User-Agent": "SatMesh/1.0 (BAH2026 research)"}
     for j in range(g):
         for i in range(g):
-            url = ESRI.format(z=z, x=rx + i, y=ry + j)
+            tx, ty = rx + i, ry + j
+            url = BING.format(s=(tx + ty) % 4, qk=_quadkey(tx, ty, z))
             for _ in range(3):
                 try:
                     r = session.get(url, timeout=20, headers=hdr)

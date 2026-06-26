@@ -29,5 +29,17 @@
   "terrain_western_ghats": {"name": "Western Ghats", "terrain": "mountain", "bbox": [13.30, 75.00, 13.42, 75.13]},
   "terrain_kerala_backwaters": {"name": "Kerala backwaters", "terrain": "coastal", "bbox": [9.40, 76.30, 9.52, 76.42]},
   "terrain_kutch":    {"name": "Rann of Kutch edge", "terrain": "desert", "bbox": [23.70, 70.00, 23.82, 70.14]},
-  "terrain_assam_tea":{"name": "Assam tea hills",   "terrain": "forest", "bbox": [26.70, 94.10, 26.82, 94.24]}
+  "terrain_assam_tea":{"name": "Assam tea hills",   "terrain": "forest", "bbox": [26.70, 94.10, 26.82, 94.24]},
+
+  "lutyens_delhi":     {"name": "Lutyens Delhi (tree-lined avenues)", "terrain": "urban_canopy", "bbox": [28.59, 77.19, 28.63, 77.23]},
+  "cubbon_bengaluru":  {"name": "Cubbon Park area Bengaluru",          "terrain": "urban_canopy", "bbox": [12.97, 77.59, 12.99, 77.62]},
+  "whitefield":        {"name": "Whitefield suburban sprawl",          "terrain": "suburban",     "bbox": [12.97, 77.73, 13.02, 77.78]},
+  "gurgaon":           {"name": "Gurgaon suburban",                    "terrain": "suburban",     "bbox": [28.44, 77.02, 28.52, 77.10]},
+  "noida":             {"name": "Noida suburban",                      "terrain": "suburban",     "bbox": [28.54, 77.33, 28.59, 77.39]},
+  "shimla_town":       {"name": "Shimla hillside town",                "terrain": "mountain",     "bbox": [31.09, 77.16, 31.12, 77.20]},
+  "mussoorie":         {"name": "Mussoorie hillside",                  "terrain": "mountain",     "bbox": [30.45, 78.06, 30.47, 78.10]},
+  "coimbatore":        {"name": "Coimbatore",                          "terrain": "urban",        "bbox": [11.00, 76.95, 11.08, 77.03]},
+  "vizag":             {"name": "Visakhapatnam coastal",               "terrain": "coastal",      "bbox": [17.69, 83.22, 17.76, 83.30]},
+  "indore":            {"name": "Indore",                              "terrain": "urban",        "bbox": [22.71, 75.85, 22.79, 75.94]},
+  "bhilai_industrial": {"name": "Bhilai industrial zone",              "terrain": "industrial",   "bbox": [21.19, 81.37, 21.25, 81.45]}
 }
