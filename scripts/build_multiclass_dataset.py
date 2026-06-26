@@ -154,7 +154,7 @@ def build_region(cid, cfg, out_dir, z, grid, windows, tile,
 
     print(f"[{cid}] terrain={cfg.terrain} — fetching OSM roads...", flush=True)
     try:
-        roads = fetch_osm_roads(cfg.bbox, network_type="all")
+        roads = fetch_osm_roads(cfg.bbox, network_type="drive")
         roads_merc = roads.to_crs("EPSG:3857") if len(roads) else None
     except Exception as e:
         print(f"[{cid}] OSM failed ({e}) — skipping")
