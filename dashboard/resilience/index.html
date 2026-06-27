@@ -330,15 +330,12 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
     <div class="search-zone">
       <div class="search-wrap">
         <svg class="search-ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="searchInput" class="search-input" type="text" placeholder="Search location within Bengaluru" autocomplete="off" />
+        <input id="searchInput" class="search-input" type="text" placeholder="Search any location" autocomplete="off" />
         <ul id="searchDrop" class="sdrop"></ul>
       </div>
     </div>
 
     <div class="topbar-meta">
-      <span class="mk">City</span>
-      <span class="mv" id="cityName">Bengaluru</span>
-      <div class="msep"></div>
       <span class="mk">Source</span>
       <span class="mv">OSM + SRTM</span>
     </div>
@@ -398,13 +395,13 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
       <div id="map">
         <div class="map-ctrl">
           <div class="cg-v">
-            <button id="zoomIn"  class="cb cb-z">+</button>
-            <button id="zoomOut" class="cb cb-z">&#8722;</button>
-          </div>
-          <div class="cg-v">
             <button id="bDark" class="cb on">Dark</button>
             <button id="bSat"  class="cb">Satellite</button>
             <button id="bNet"  class="cb">Network</button>
+          </div>
+          <div class="cg-v">
+            <button id="zoomIn"  class="cb cb-z">+</button>
+            <button id="zoomOut" class="cb cb-z">&#8722;</button>
           </div>
         </div>
       </div>
@@ -538,7 +535,6 @@ function mDist(a,b){const la=(a.lat+b.lat)/2*Math.PI/180;const dx=(a.lon-b.lon)*
 
 fetch('resilience.json').then(r=>r.json()).then(d=>{
   DATA=d; const m=d.metrics;
-  cityName.textContent=d.city;
   mNodes.textContent=m.n_nodes.toLocaleString();
   mEdges.textContent=m.n_edges.toLocaleString();
   mComps.textContent='1';
@@ -796,40 +792,34 @@ function buildGK(sorted){
 }
 
 /* ── SEARCH ──────────────────────────────────────── */
-const PLACES=[
-  {name:'MG Road',            region:'Central Bengaluru',     lat:12.9756,lon:77.6099},
-  {name:'Cubbon Park',        region:'Central Bengaluru',     lat:12.9763,lon:77.5929},
-  {name:'Majestic',           region:'Central Bengaluru',     lat:12.9769,lon:77.5713},
-  {name:'Lalbagh',            region:'South Bengaluru',       lat:12.9497,lon:77.5847},
-  {name:'Indiranagar',        region:'East Bengaluru',        lat:12.9784,lon:77.6408},
-  {name:'Koramangala',        region:'South East Bengaluru',  lat:12.9352,lon:77.6245},
-  {name:'Jayanagar',          region:'South Bengaluru',       lat:12.9259,lon:77.5850},
-  {name:'Vidhana Soudha',     region:'Central Bengaluru',     lat:12.9795,lon:77.5909},
-  {name:'Ulsoor Lake',        region:'Central Bengaluru',     lat:12.9825,lon:77.6215},
-  {name:'Brigade Road',       region:'Central Bengaluru',     lat:12.9703,lon:77.6098},
-  {name:'KR Circle',          region:'Central Bengaluru',     lat:12.9760,lon:77.5950},
-  {name:'Shivajinagar',       region:'North Central',         lat:12.9850,lon:77.6020},
-  {name:'Domlur',             region:'East Bengaluru',        lat:12.9607,lon:77.6389},
-  {name:'Residency Road',     region:'Central Bengaluru',     lat:12.9676,lon:77.6053},
-  {name:'Richmond Road',      region:'Central Bengaluru',     lat:12.9592,lon:77.5999},
-];
-
 const srchInput=document.getElementById('searchInput');
 const srchDrop=document.getElementById('searchDrop');
+let srchT=null;
 
 srchInput.addEventListener('input',()=>{
-  const q=srchInput.value.trim().toLowerCase();
-  if(!q){srchDrop.classList.remove('open');return;}
-  const hits=PLACES.filter(p=>p.name.toLowerCase().includes(q)||p.region.toLowerCase().includes(q)).slice(0,6);
-  srchDrop.innerHTML=hits.map(p=>`<li data-lat="${p.lat}" data-lon="${p.lon}"><div>${p.name}</div><div class="sdrop-sub">${p.region}</div></li>`).join('');
-  srchDrop.classList.toggle('open',hits.length>0);
-  srchDrop.querySelectorAll('li').forEach(li=>{
-    li.onclick=()=>{
-      map.flyTo({center:[+li.dataset.lon,+li.dataset.lat],zoom:15.5,duration:900});
-      srchInput.value=li.querySelector('div').textContent;
-      srchDrop.classList.remove('open');
-    };
-  });
+  const q=srchInput.value.trim();
+  clearTimeout(srchT);
+  if(q.length<2){srchDrop.classList.remove('open');return;}
+  srchT=setTimeout(async()=>{
+    try{
+      const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`);
+      const hits=await res.json();
+      srchDrop.innerHTML=hits.map(p=>{
+        const parts=p.display_name.split(',');
+        const title=parts[0].trim();
+        const sub=parts.slice(1,3).join(',').trim();
+        return`<li data-lat="${p.lat}" data-lon="${p.lon}"><div>${title}</div><div class="sdrop-sub">${sub}</div></li>`;
+      }).join('');
+      srchDrop.classList.toggle('open',hits.length>0);
+      srchDrop.querySelectorAll('li').forEach(li=>{
+        li.onclick=()=>{
+          map.flyTo({center:[+li.dataset.lon,+li.dataset.lat],zoom:14,duration:900});
+          srchInput.value=li.querySelector('div').textContent;
+          srchDrop.classList.remove('open');
+        };
+      });
+    }catch(e){srchDrop.classList.remove('open');}
+  },350);
 });
 
 document.addEventListener('click',e=>{if(!e.target.closest('.search-zone')) srchDrop.classList.remove('open');});
