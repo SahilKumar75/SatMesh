@@ -9,16 +9,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
 :root {
-  --bg:    #07101e;
-  --s1:    #0b1421;
-  --s2:    #0f1b2d;
-  --s3:    #142036;
-  --b1:    #1c2e44;
-  --b2:    #243a56;
+  --bg:    #070f1c;
+  --s1:    #0b1828;
+  --s2:    #162638;
+  --s3:    #1c2e48;
+  --b1:    #243652;
+  --b2:    #2e4468;
 
-  --t0:    #cddcec;
-  --t1:    #7c9ab8;
-  --t2:    #485f78;
+  --t0:    #c8d8ea;
+  --t1:    #7a96b4;
+  --t2:    #5e7898;
 
   --amber: #b07818;
   --teal:  #2272a4;
@@ -111,8 +111,8 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
   flex: none; display: flex; flex-direction: column;
   overflow: hidden; background: var(--s1);
 }
-.lp { width: 258px; border-right: 1px solid var(--b1); }
-.rp { width: 318px; border-left:  1px solid var(--b1); }
+.lp { width: 220px; border-right: 1px solid var(--b1); }
+.rp { width: 272px; border-left:  1px solid var(--b1); }
 
 .ps {
   padding: 12px 12px 10px;
@@ -147,7 +147,19 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
 
 /* ── MAP ZONE ────────────────────────────────────── */
 .mz { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-#map { flex: 1; min-height: 0; }
+#map { flex: 1; min-height: 0; position: relative; }
+
+/* ── MAP CORNER CONTROLS ─────────────────────────── */
+.map-ctrl {
+  position: absolute; bottom: 14px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 5px; align-items: stretch;
+}
+.cg-v {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--b1); border-radius: var(--r); overflow: hidden;
+}
+.cg-v .cb + .cb { border-left: none; border-top: 1px solid var(--b1); }
+.cb-z { font-family: var(--fm); font-size: 13px; padding: 5px 11px; }
 
 /* ── MAP FOOTER ──────────────────────────────────── */
 .mf {
@@ -235,7 +247,7 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
 /* ── SPARK ───────────────────────────────────────── */
 .spark {
   display: flex; align-items: flex-end; gap: 1.5px;
-  margin-top: 8px; height: 36px; flex: 1; min-height: 24px;
+  margin-top: 8px; height: 36px; flex: none;
 }
 .b { flex: 1; border-radius: 1px 1px 0 0; background: var(--s3); }
 
@@ -367,7 +379,7 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
         </div>
       </section>
 
-      <section class="ps grow">
+      <section class="ps">
         <div class="ph">Map Layer</div>
         <div class="tog">
           <button id="vCrit" class="tb on">Criticality Worth</button>
@@ -383,18 +395,20 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
 
     <!-- MAP -->
     <div class="mz">
-      <div id="map"></div>
-      <div class="mf">
-        <div class="mc">
-          <div class="cg">
+      <div id="map">
+        <div class="map-ctrl">
+          <div class="cg-v">
             <button id="zoomIn"  class="cb cb-z">+</button>
             <button id="zoomOut" class="cb cb-z">&#8722;</button>
           </div>
-          <div class="cg">
+          <div class="cg-v">
             <button id="bDark" class="cb on">Dark</button>
             <button id="bSat"  class="cb">Satellite</button>
+            <button id="bNet"  class="cb">Network</button>
           </div>
         </div>
+      </div>
+      <div class="mf">
         <div class="tlbar">
           <button class="pbtn" id="play" title="Play scenario">
             <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M8 5v14l11-7z"/></svg>
@@ -423,7 +437,7 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
         <p class="sdesc" id="scendesc"></p>
       </section>
 
-      <section class="ps fill">
+      <section class="ps">
         <div class="ph">Live Network Impact</div>
         <div class="rg">
           <div class="ro"><span class="rv" id="rLost" style="color:var(--teal)">0%</span><span class="rl">Roads Lost</span></div>
@@ -440,7 +454,7 @@ html, body { height: 100%; background: var(--bg); color: var(--t0); font-family:
         <div id="gklist"></div>
       </section>
 
-      <section class="ps grow">
+      <section class="ps">
         <div class="ph">Legend</div>
         <div class="leg">
           <div class="li"><span class="ld" style="background:var(--red)"></span><span>Gatekeeper Node</span></div>
@@ -460,6 +474,7 @@ const C = {
 };
 const DARK = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 const SAT = {version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256}},layers:[{id:'sat',type:'raster',source:'sat'}]};
+const NET = {version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#07101e'}}]};
 
 function critColor(t) {
   const lerp=(a,b,k)=>a.map((v,i)=>Math.round(v+(b[i]-v)*k));
@@ -638,9 +653,12 @@ function refreshEdgeFields(){
 
 bDark.onclick=()=>setBase('dark');
 bSat.onclick=()=>setBase('sat');
+bNet.onclick=()=>setBase('net');
 function setBase(b){
-  bDark.classList.toggle('on',b==='dark'); bSat.classList.toggle('on',b==='sat');
-  map.setStyle(b==='dark'?DARK:SAT);
+  bDark.classList.toggle('on',b==='dark');
+  bSat.classList.toggle('on',b==='sat');
+  bNet.classList.toggle('on',b==='net');
+  map.setStyle(b==='dark'?DARK:b==='sat'?SAT:NET);
   map.once('styledata',()=>setTimeout(addData,140));
 }
 
